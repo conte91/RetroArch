@@ -201,6 +201,11 @@ typedef struct rcheevos_locals_t
    bool leaderboards_enabled;         /* leaderboards are enabled */
    bool leaderboard_notifications;    /* leaderboard notifications are enabled */
    bool leaderboard_trackers;         /* leaderboard trackers are enabled */
+
+   /* Cache state */
+   bool cache_initialized;            /* true if cache system is initialized */
+   bool loaded_from_cache;            /* true if current game was loaded from cache */
+   uint32_t cache_game_id;            /* game ID of currently cached game */
 } rcheevos_locals_t;
 
 rcheevos_locals_t* get_rcheevos_locals(void);

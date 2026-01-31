@@ -343,6 +343,7 @@ typedef struct settings
 
       unsigned cheevos_appearance_anchor;
       unsigned cheevos_visibility_summary;
+      unsigned cheevos_cache_max_age_days;
    } uints;
 
    struct
@@ -829,6 +830,7 @@ typedef struct settings
       bool cheevos_visibility_unlock;
       bool cheevos_visibility_mastery;
       bool cheevos_visibility_account;
+      bool cheevos_cache_enabled;
 
       /* Camera */
       bool camera_allow;

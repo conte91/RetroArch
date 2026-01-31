@@ -16,6 +16,7 @@
 #include "cheevos_client.h"
 
 #include "cheevos.h"
+#include "cheevos_cache.h"
 
 #include "../configuration.h"
 #include "../file_path_special.h"
@@ -31,6 +32,8 @@
 #include "../frontend/frontend_driver.h"
 #include "../network/net_http_special.h"
 #include "../tasks/tasks_internal.h"
+
+#include "../configuration.h"
 
 #ifdef HAVE_PRESENCE
 #include "../network/presence.h"

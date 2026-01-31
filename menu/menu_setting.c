@@ -375,7 +375,7 @@ static void menu_input_st_uint_cb(void *userdata, const char *str)
 
       if ((ret == 1) && !str[chars_read])
       {
-         const char        *label = 
+         const char        *label =
             menu_input_dialog_get_label_setting_buffer();
          rarch_setting_t *setting = menu_setting_find(label);
          setting_set_with_string_representation(setting, str);
@@ -397,9 +397,9 @@ static void menu_input_st_int_cb(void *userdata, const char *str)
 
       if ((ret == 1) && !str[chars_read])
       {
-         const char *label = 
+         const char *label =
             menu_input_dialog_get_label_setting_buffer();
-         rarch_setting_t 
+         rarch_setting_t
             *setting       = menu_setting_find(label);
          setting_set_with_string_representation(setting, str);
       }
@@ -473,7 +473,7 @@ static void menu_input_st_float_cb(void *userdata, const char *str)
 
       if ((ret == 1) && !str[chars_read])
       {
-         const char        *label = 
+         const char        *label =
             menu_input_dialog_get_label_setting_buffer();
          rarch_setting_t *setting = menu_setting_find(label);
          setting_set_with_string_representation(setting, str);
@@ -793,7 +793,7 @@ int setting_uint_action_left_default(
       {
          settings_t *settings = config_get_ptr();
 
-         if (settings && 
+         if (settings &&
              settings->bools.menu_navigation_wraparound_enable)
          {
             float max = setting->max;
@@ -976,7 +976,7 @@ void setting_generic_handle_change(rarch_setting_t *setting)
    if (setting->change_handler)
       setting->change_handler(setting);
 
-   if (       setting->cmd_trigger_idx 
+   if (       setting->cmd_trigger_idx
          && !(setting->flags & SD_FLAG_CMD_TRIGGER_EVENT_TRIGGERED))
       command_event(setting->cmd_trigger_idx, NULL);
 }
@@ -1124,7 +1124,7 @@ static int setting_fraction_action_left_default(
    if (!setting)
       return -1;
 
-   *setting->value.target.fraction = 
+   *setting->value.target.fraction =
       *setting->value.target.fraction - setting->step;
 
    if (setting->flags & SD_FLAG_ENFORCE_MINRANGE)
@@ -1259,7 +1259,7 @@ static void setting_get_string_representation_st_bool(rarch_setting_t *setting,
       char *s, size_t len)
 {
    if (setting)
-      strlcpy(s, *setting->value.target.boolean 
+      strlcpy(s, *setting->value.target.boolean
             ? setting->boolean.on_label
             : setting->boolean.off_label,
             len);
@@ -1288,7 +1288,7 @@ static void setting_get_string_representation_st_dir(rarch_setting_t *setting,
    if (setting)
       strlcpy(s,
              *setting->value.target.string
-            ? setting->value.target.string 
+            ? setting->value.target.string
             : setting->dir.empty_path,
             len);
 }
@@ -1876,8 +1876,8 @@ static int setting_bool_action_ok_default(
       return -1;
 
    setting_set_with_string_representation(setting,
-          *setting->value.target.boolean 
-         ? "false" 
+          *setting->value.target.boolean
+         ? "false"
          : "true");
 
    return 0;
@@ -7244,7 +7244,7 @@ static void menu_settings_list_current_add_range(
 
    if ((*list)[idx].type == ST_FLOAT)
       (*list)[idx].ui_type        = ST_UI_TYPE_FLOAT_SLIDER_AND_SPINBOX;
-                                  
+
    (*list)[idx].min               = min;
    (*list)[idx].step              = step;
    (*list)[idx].max               = max;
@@ -8181,9 +8181,9 @@ static void general_write_handler(rarch_setting_t *setting)
       case MENU_ENUM_LABEL_VIDEO_DINGUX_REFRESH_RATE:
          {
             settings_t *settings         = config_get_ptr();
-            enum dingux_refresh_rate 
+            enum dingux_refresh_rate
                current_refresh_rate      = DINGUX_REFRESH_RATE_60HZ;
-            enum dingux_refresh_rate 
+            enum dingux_refresh_rate
                target_refresh_rate       =
                   (enum dingux_refresh_rate)settings->uints.video_dingux_refresh_rate;
             bool refresh_rate_valid                       = false;
@@ -8236,7 +8236,7 @@ static void general_write_handler(rarch_setting_t *setting)
             settings->modified               = true;
             settings->bools.video_hdr_enable = *setting->value.target.boolean;
 
-            rarch_cmd = CMD_EVENT_REINIT;            
+            rarch_cmd = CMD_EVENT_REINIT;
          }
          break;
       case MENU_ENUM_LABEL_VIDEO_HDR_MAX_NITS:
@@ -9200,10 +9200,10 @@ static bool setting_append_list_input_player_options(
       strlcpy(label_mouse_index[user],
             msg_hash_to_str(MENU_ENUM_LABEL_VALUE_INPUT_MOUSE_INDEX),
             sizeof(label_mouse_index[user]));
-      strlcpy(label_bind_all[user], 
+      strlcpy(label_bind_all[user],
             msg_hash_to_str(MENU_ENUM_LABEL_VALUE_INPUT_BIND_ALL),
             sizeof(label_bind_all[user]));
-      strlcpy(label_bind_defaults[user], 
+      strlcpy(label_bind_defaults[user],
             msg_hash_to_str(MENU_ENUM_LABEL_VALUE_INPUT_BIND_DEFAULT_ALL),
             sizeof(label_bind_defaults[user]));
       strlcpy(label_bind_all_save_autoconfig[user],
@@ -9361,8 +9361,8 @@ static bool setting_append_list_input_player_options(
          char label[NAME_MAX_LENGTH];
          char name[NAME_MAX_LENGTH];
 
-         i =  (j < RARCH_ANALOG_BIND_LIST_END) 
-            ? input_config_bind_order[j] 
+         i =  (j < RARCH_ANALOG_BIND_LIST_END)
+            ? input_config_bind_order[j]
             : j;
 
          if (input_config_bind_map_get_meta(i))
@@ -9454,7 +9454,7 @@ static bool setting_append_list_input_libretro_device_options(
             msg_hash_to_str(MENU_ENUM_LABEL_INPUT_LIBRETRO_DEVICE),
             user + 1);
 
-      strlcpy(label_device_type[user], 
+      strlcpy(label_device_type[user],
             msg_hash_to_str(MENU_ENUM_LABEL_VALUE_INPUT_DEVICE_TYPE),
             sizeof(label_device_type[user]));
 
@@ -9520,7 +9520,7 @@ static bool setting_append_list_input_remap_port_options(
                msg_hash_to_str(MENU_ENUM_LABEL_INPUT_REMAP_PORT),
                user + 1);
 
-      strlcpy(label_port[user], 
+      strlcpy(label_port[user],
             msg_hash_to_str(MENU_ENUM_LABEL_VALUE_INPUT_REMAP_PORT),
             sizeof(label_port[user]));
 
@@ -13257,7 +13257,7 @@ static bool setting_append_list(
                         general_read_handler);
                   (*list)[list_info->index - 1].action_ok = &setting_action_ok_uint;
                   menu_settings_list_current_add_range(list, list_info, 0, 5, 1, true, true);
-               }  
+               }
             }
 #endif
             END_SUB_GROUP(list, list_info, parent_group);
@@ -13402,7 +13402,7 @@ static bool setting_append_list(
          (*list)[list_info->index - 1].offset_by     = 0;
          SETTINGS_DATA_LIST_CURRENT_ADD_FLAGS(list, list_info, SD_FLAG_ADVANCED);
          menu_settings_list_current_add_range(list, list_info, -20, 20, 1.0, true, true);
-         
+
          CONFIG_BOOL(
                list, list_info,
                &settings->bools.crt_switch_custom_refresh_enable,
@@ -20237,6 +20237,38 @@ static bool setting_append_list(
          (*list)[list_info->index - 1].free_flags &= ~SD_FREE_FLAG_VALUES;
 
          CONFIG_BOOL(
+            list, list_info,
+            &settings->bools.cheevos_cache_enabled,
+            MENU_ENUM_LABEL_CHEEVOS_CACHE_ENABLED,
+            MENU_ENUM_LABEL_VALUE_CHEEVOS_CACHE_ENABLED,
+            DEFAULT_CHEEVOS_CACHE_ENABLED,
+            MENU_ENUM_LABEL_VALUE_OFF,
+            MENU_ENUM_LABEL_VALUE_ON,
+            &group_info,
+            &subgroup_info,
+            parent_group,
+            general_write_handler,
+            general_read_handler,
+            SD_FLAG_NONE
+         );
+
+         CONFIG_UINT(
+            list, list_info,
+            &settings->uints.cheevos_cache_max_age_days,
+            MENU_ENUM_LABEL_CHEEVOS_CACHE_MAX_AGE_DAYS,
+            MENU_ENUM_LABEL_VALUE_CHEEVOS_CACHE_MAX_AGE_DAYS,
+            DEFAULT_CHEEVOS_CACHE_MAX_AGE_DAYS,
+            &group_info,
+            &subgroup_info,
+            parent_group,
+            general_write_handler,
+            general_read_handler
+         );
+         (*list)[list_info->index - 1].action_ok     = &setting_action_ok_uint;
+         menu_settings_list_current_add_range(list, list_info, 1, 30, 1, true, true);
+
+
+         CONFIG_BOOL(
                list, list_info,
                &settings->bools.cheevos_richpresence_enable,
                MENU_ENUM_LABEL_CHEEVOS_RICHPRESENCE_ENABLE,
@@ -20530,7 +20562,6 @@ static bool setting_append_list(
             general_read_handler,
             SD_FLAG_ADVANCED
          );
-
 
          END_SUB_GROUP(list, list_info, parent_group);
          END_GROUP(list, list_info, parent_group);
@@ -21488,7 +21519,7 @@ static bool setting_append_list(
                MENU_ENUM_LABEL_VALUE_ACCOUNTS_FACEBOOK,
                &group_info,
                &subgroup_info,
-               parent_group);         
+               parent_group);
 #endif
 
          END_SUB_GROUP(list, list_info, parent_group);
@@ -21577,7 +21608,7 @@ static bool setting_append_list(
 
          END_SUB_GROUP(list, list_info, parent_group);
          END_GROUP(list, list_info, parent_group);
-         break;         
+         break;
       case SETTINGS_LIST_USER_ACCOUNTS_CHEEVOS:
          START_GROUP(list, list_info, &group_info,
                msg_hash_to_str(MENU_ENUM_LABEL_VALUE_ACCOUNTS_CHEEVOS_SETTINGS),
@@ -22582,7 +22613,7 @@ static rarch_setting_t *menu_setting_new_internal(rarch_setting_info_t *list_inf
    if (!list)
       return NULL;
 
-   root                                 = 
+   root                                 =
       msg_hash_to_str(MENU_ENUM_LABEL_MAIN_MENU);
 
    for (i = 0; i < (unsigned)list_info->size; i++)

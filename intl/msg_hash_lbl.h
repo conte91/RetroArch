@@ -612,6 +612,14 @@ MSG_HASH(
    "cheevos_visibility_account"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_CHEEVOS_CACHE_ENABLED,
+   "cheevos_cache_enabled"
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_CHEEVOS_CACHE_MAX_AGE_DAYS,
+   "cheevos_cache_max_age_days"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_CLOSE_CONTENT,
    "unload_core"
    )

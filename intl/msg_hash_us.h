@@ -6560,6 +6560,22 @@ MSG_HASH(
    MENU_ENUM_SUBLABEL_CHEEVOS_VERBOSE_ENABLE,
    "Shows additional diagnostic and error messages."
    )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CHEEVOS_CACHE_ENABLED,
+   "Offline Cache"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CHEEVOS_CACHE_ENABLED,
+   "Cache achievement data for offline play. Allows achievements to work without an internet connection after the game has been played once online."
+   )
+MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CHEEVOS_CACHE_MAX_AGE_DAYS,
+   "Cache Max Age (Days)"
+   )
+MSG_HASH(
+   MENU_ENUM_SUBLABEL_CHEEVOS_CACHE_MAX_AGE_DAYS,
+   "Number of days to keep cached achievement data before refreshing from the server."
+   )
 
 /* Settings > Network */
 

@@ -295,6 +295,8 @@ DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_achievement_pause_cancel,      MENU_
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_achievement_resume_cancel,     MENU_ENUM_SUBLABEL_ACHIEVEMENT_RESUME_CANCEL)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_enable,                MENU_ENUM_SUBLABEL_CHEEVOS_ENABLE)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_test_unofficial,       MENU_ENUM_SUBLABEL_CHEEVOS_TEST_UNOFFICIAL)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_cache_enabled,         MENU_ENUM_SUBLABEL_CHEEVOS_CACHE_ENABLED)
+DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_cache_max_age_days,    MENU_ENUM_SUBLABEL_CHEEVOS_CACHE_MAX_AGE_DAYS)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_hardcore_mode_enable,  MENU_ENUM_SUBLABEL_CHEEVOS_HARDCORE_MODE_ENABLE)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_leaderboards_enable,   MENU_ENUM_SUBLABEL_CHEEVOS_LEADERBOARDS_ENABLE)
 DEFAULT_SUBLABEL_MACRO(action_bind_sublabel_cheevos_challenge_indicators,  MENU_ENUM_SUBLABEL_CHEEVOS_CHALLENGE_INDICATORS)
@@ -1537,7 +1539,7 @@ static int action_bind_sublabel_input_remap_port(
 
    MENU_ENTRY_INITIALIZE(entry);
 
-   entry.flags |= MENU_ENTRY_FLAG_LABEL_ENABLED; 
+   entry.flags |= MENU_ENTRY_FLAG_LABEL_ENABLED;
 
    menu_entry_get(&entry, 0, i, NULL, false);
 
@@ -4377,6 +4379,12 @@ int menu_cbs_init_bind_sublabel(menu_file_list_cbs_t *cbs,
             break;
          case MENU_ENUM_LABEL_CHEEVOS_TEST_UNOFFICIAL:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_cheevos_test_unofficial);
+            break;
+         case MENU_ENUM_LABEL_CHEEVOS_CACHE_ENABLED:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_cheevos_cache_enabled);
+            break;
+         case MENU_ENUM_LABEL_CHEEVOS_CACHE_MAX_AGE_DAYS:
+            BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_cheevos_cache_max_age_days);
             break;
          case MENU_ENUM_LABEL_CHEEVOS_HARDCORE_MODE_ENABLE:
             BIND_ACTION_SUBLABEL(cbs, action_bind_sublabel_cheevos_hardcore_mode_enable);
