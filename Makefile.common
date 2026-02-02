@@ -2127,8 +2127,9 @@ ifeq ($(HAVE_NETWORKING), 1)
       INCLUDE_DIRS += -Ideps/rcheevos/include
 
       OBJ += cheevos/cheevos.o \
-             cheevos/cheevos_cache.o \
              cheevos/cheevos_client.o \
+             cheevos/cheevos_cache.o \
+             cheevos/cheevos_cache_data.o \
              cheevos/cheevos_menu.o \
              $(LIBRETRO_COMM_DIR)/formats/cdfs/cdfs.o \
              deps/rcheevos/src/rcheevos/alloc.o \
