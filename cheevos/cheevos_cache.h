@@ -68,18 +68,6 @@ bool rcheevos_cache_save_hash_mapping(const char* hash, rcheevos_cache_hash_t* r
  ************************************************************************/
 
 
-/* Pending unlock entry for offline queue */
-typedef struct rcheevos_pending_unlock_t
-{
-   uint32_t game_id;       /* Game ID this unlock belongs to */
-   uint32_t id;            /* Achievement or leaderboard ID */
-   time_t timestamp;       /* When the unlock/submission occurred */
-   uint32_t retries;       /* Number of retry attempts */
-   bool hardcore;          /* Whether this was earned in hardcore mode */
-   bool is_leaderboard;    /* true for leaderboard, false for achievement */
-   int32_t score;          /* Leaderboard score (only valid if is_leaderboard) */
-} rcheevos_pending_unlock_t;
-
 /* Initialize the cache system - creates directories if needed */
 bool rcheevos_cache_init(void);
 
@@ -149,9 +137,13 @@ bool rcheevos_cache_queue_leaderboard_submit(
 /* Get pending unlocks for a user
  * Caller must free the returned array
  * Returns count of pending items, or -1 on error */
-int rcheevos_cache_get_pending_unlocks(
+bool rcheevos_cache_get_pending_unlocks(
    const char* username,
-   rcheevos_pending_unlock_t** pending_out);
+   rcheevos_cache_pending_list_t* out);
+
+bool rcheevos_cache_save_pending_unlocks(
+   const char* username,
+   const rcheevos_cache_pending_list_t* data);
 
 /* Remove a pending unlock after successful sync */
 bool rcheevos_cache_remove_pending_unlock(

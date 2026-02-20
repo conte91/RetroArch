@@ -41,7 +41,9 @@ RETRO_BEGIN_DECLS
 /* Define this macro to get extra-verbose log for cheevos. */
 #define CHEEVOS_VERBOSE
 
-#define RCHEEVOS_TAG "[RCHEEVOS]: "
+#define RCHEEVOS_STRINGIFY2(x) #x
+#define RCHEEVOS_STRINGIFY(x)  RCHEEVOS_STRINGIFY2(x)
+#define RCHEEVOS_TAG "[RCHEEVOS]: (" __FILE__ ":" RCHEEVOS_STRINGIFY(__LINE__) ") "
 #define CHEEVOS_FREE(p) do { void* q = (void*)p; if (q) free(q); } while (0)
 
 #ifdef CHEEVOS_VERBOSE
@@ -174,6 +176,7 @@ typedef struct rcheevos_locals_t
    enum event_command queued_command; /* action queued by background thread to be run on main thread */
 #endif
 
+   bool local_only;                   /* No network connection / retroachievement server available. Only use local/cached data. */
    char displayname[32];              /* name to display in messages */
    char username[32];                 /* case-corrected username */
    char token[32];                    /* user's session token */

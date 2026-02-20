@@ -89,11 +89,12 @@ static rcheevos_locals_t rcheevos_locals =
 #ifdef HAVE_THREADS
       CMD_EVENT_NONE, /* queued_command */
 #endif
-      "", /* displayname */
-      "", /* username */
-      "", /* token */
-      "", /* user_agent_prefix */
-      "", /* user_agent_core */
+      true, /* local_only */
+      "",   /* displayname */
+      "",   /* username */
+      "",   /* token */
+      "",   /* user_agent_prefix */
+      "",   /* user_agent_core */
 #ifdef HAVE_MENU
       NULL, /* menuitems */
       0,    /* menuitem_capacity */
@@ -143,8 +144,8 @@ static void rcheevos_achievement_disabled(
       return;
 
    CHEEVOS_ERR(RCHEEVOS_TAG
-               "Achievement %u disabled (invalid address %06X): %s\n",
-               cheevo->id, address, cheevo->title);
+               "Achievement %u with definition: `%s` disabled (invalid address %06X): %s\n",
+               cheevo->id, cheevo->memaddr, address, cheevo->title);
    CHEEVOS_FREE(cheevo->memaddr);
    cheevo->memaddr = NULL;
    cheevo->active |= RCHEEVOS_ACTIVE_UNSUPPORTED;
@@ -1117,6 +1118,7 @@ void rcheevos_hardcore_enabled_changed(void)
 
 void rcheevos_validate_config_settings(void)
 {
+   CHEEVOS_LOG(RCHEEVOS_TAG "Validate settings starts :)\n");
    int i;
    const rc_disallowed_setting_t
       *disallowed_settings = NULL;
@@ -1126,7 +1128,10 @@ void rcheevos_validate_config_settings(void)
    const settings_t *settings = config_get_ptr();
 
    if (!system->library_name || !rcheevos_locals.hardcore_active)
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "No system libname\n");
       return;
+   }
 
    if (!settings->bools.video_frame_delay_auto && settings->uints.video_frame_delay != 0)
    {
@@ -1140,10 +1145,16 @@ void rcheevos_validate_config_settings(void)
    }
 
    if (!(disallowed_settings = rc_libretro_get_disallowed_settings(system->library_name)))
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "Disallowed setting :O\n");
       return;
+   }
 
    if (!retroarch_ctl(RARCH_CTL_CORE_OPTIONS_LIST_GET, &coreopts))
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "RARCH CTL :O\n");
       return;
+   }
 
    for (i = 0; i < (int) coreopts->size; i++)
    {
@@ -1177,8 +1188,10 @@ void rcheevos_validate_config_settings(void)
 
       runloop_msg_queue_push(buffer, 0, 4 * 60, false, NULL,
                              MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_WARNING);
+      CHEEVOS_LOG(RCHEEVOS_TAG "In console ID return\n");
       return;
    }
+   CHEEVOS_LOG(RCHEEVOS_TAG "Validate settings finished :)\n");
 }
 
 static void rcheevos_runtime_event_handler(
@@ -1770,6 +1783,7 @@ static void rcheevos_fetch_badges(void)
 
 static void rcheevos_start_session_async(retro_task_t *task)
 {
+   CHEEVOS_LOG(RCHEEVOS_TAG "rcheevos_start_session_async\n");
    const bool needs_runtime =
       (rcheevos_locals.game.achievement_count > 0 || rcheevos_locals.game.leaderboard_count > 0 || rcheevos_locals.runtime.richpresence);
 
@@ -1837,11 +1851,16 @@ static void rcheevos_start_session_async(retro_task_t *task)
    task_set_finished(task, true);
 
    if (rcheevos_end_load_state() == 0)
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "I am fetching badges :)\n");
       rcheevos_fetch_badges();
+   }
+   CHEEVOS_LOG(RCHEEVOS_TAG "End rcheevos_start_session_async\n");
 }
 
 static void rcheevos_start_session_finish(retro_task_t *task, void *data, void *userdata, const char *error)
 {
+   CHEEVOS_LOG(RCHEEVOS_TAG "rcheevos_start_session_finish\n");
    (void) task;
    (void) data;
    (void) userdata;
@@ -1873,18 +1892,13 @@ static void rcheevos_start_session(void)
 
 static void rcheevos_initialize_runtime_callback(void *userdata)
 {
+   CHEEVOS_LOG(RCHEEVOS_TAG "rcheevos_initialize_runtime_callback()\n");
    rcheevos_start_session();
+   CHEEVOS_LOG(RCHEEVOS_TAG "end rcheevos_initialize_runtime_callback()\n");
 }
 
 static void rcheevos_fetch_game_data(void)
 {
-   if (rcheevos_locals.load_info.state == RCHEEVOS_LOAD_STATE_NETWORK_ERROR)
-   {
-      rcheevos_locals.game.hash = NULL;
-      rcheevos_pause_hardcore();
-      return;
-   }
-
    if (rcheevos_locals.game.id <= 0)
    {
       const settings_t *settings = config_get_ptr();
@@ -1902,11 +1916,15 @@ static void rcheevos_fetch_game_data(void)
       return;
    }
 
+   if (rcheevos_locals.load_info.state == RCHEEVOS_LOAD_STATE_NETWORK_ERROR)
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "No remove achievements available.\n");
+      rcheevos_locals.local_only = true;
+   }
+
    if (!rcheevos_locals.token[0])
    {
       rcheevos_locals.load_info.state = RCHEEVOS_LOAD_STATE_LOGIN_FAILED;
-      rcheevos_pause_hardcore();
-      return;
    }
 
    /* fetch the game data and the user unlocks */
@@ -1938,8 +1956,16 @@ static void rcheevos_fetch_game_data(void)
 
    rcheevos_client_initialize_runtime(rcheevos_locals.game.id, rcheevos_initialize_runtime_callback, NULL);
 
-   if (rcheevos_end_load_state() == 0)
+   int i = rcheevos_end_load_state();
+   if (i == 0)
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "WOAH THIS LOAD STATE??\n");
       rcheevos_start_session();
+   }
+   else
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "NO SUCH  LOAD STATE?? %d left\n", i);
+   }
 }
 
 struct rcheevos_identify_game_data
@@ -2002,7 +2028,14 @@ static void rcheevos_identify_game_callback(void *userdata)
 
    /* hash resolution complete, proceed to fetching game data */
    if (rcheevos_end_load_state() == 0)
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "FETCHING\n");
       rcheevos_fetch_game_data();
+   }
+   else
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "NOT FETCHING\n");
+   }
 }
 
 static int rcheevos_get_image_path(unsigned index, char *buffer, size_t buffer_size)
@@ -2097,6 +2130,7 @@ static bool rcheevos_identify_game(const struct retro_game_info *info)
 
 static void rcheevos_login_callback(void *userdata)
 {
+   CHEEVOS_LOG(RCHEEVOS_TAG "LOGIN CALLBACK\n");
    if (rcheevos_locals.token[0])
    {
       const settings_t *settings = config_get_ptr();
@@ -2112,9 +2146,15 @@ static void rcheevos_login_callback(void *userdata)
                                 MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
       }
    }
-
    if (rcheevos_end_load_state() == 0)
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "FETCHING\n");
       rcheevos_fetch_game_data();
+   }
+   else
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "NOT FETCHING\n");
+   }
 }
 
 /* Increment the outstanding requests counter and set the load state */
@@ -2146,6 +2186,7 @@ int rcheevos_end_load_state(void)
    slock_unlock(rcheevos_locals.load_info.request_lock);
 #endif
 
+   CHEEVOS_LOG(RCHEEVOS_TAG "Outstanding %d requests\n", requests);
    return requests;
 }
 
@@ -2157,8 +2198,6 @@ bool rcheevos_load_aborted(void)
       case RCHEEVOS_LOAD_STATE_ABORTED:
       /* Unload quit waiting and ran to completion */
       case RCHEEVOS_LOAD_STATE_NONE:
-      /* Login/resolve hash failed after several attempts */
-      case RCHEEVOS_LOAD_STATE_NETWORK_ERROR:
          return true;
       default:
          break;
@@ -2168,6 +2207,7 @@ bool rcheevos_load_aborted(void)
 
 bool rcheevos_load(const void *data)
 {
+   CHEEVOS_LOG(RCHEEVOS_TAG "CHEEVOS LOAD\n");
    const struct retro_game_info *info = (const struct retro_game_info *)
       data;
    settings_t *settings = config_get_ptr();
@@ -2194,6 +2234,7 @@ bool rcheevos_load(const void *data)
       return false;
    }
 
+   CHEEVOS_LOG(RCHEEVOS_TAG "Check login\n");
    if (string_is_empty(settings->arrays.cheevos_username))
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "Cannot login (no username)\n");
@@ -2295,6 +2336,7 @@ bool rcheevos_load(const void *data)
 
    if (rcheevos_end_load_state() == 0)
    {
+      CHEEVOS_LOG(RCHEEVOS_TAG "FETCHING\n");
       rcheevos_fetch_game_data();
 
       /* Initialize offline cache if enabled */
@@ -2304,6 +2346,10 @@ bool rcheevos_load(const void *data)
          if (rcheevos_locals.cache_initialized)
             CHEEVOS_LOG(RCHEEVOS_TAG "Offline cache initialized\n");
       }
+   }
+   else
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "NOT FETCHING\n");
    }
 
    return true;

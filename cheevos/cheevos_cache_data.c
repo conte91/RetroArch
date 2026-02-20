@@ -15,6 +15,7 @@
 
 #include "cheevos_cache_data.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,16 +26,26 @@
  * Helper Macros                                                        *
  ************************************************************************/
 
-#define CHEEVOS_JSON_KEY(writer, key) \
+#define CHEEVOS_JSON_KEY(writer, key)   \
    rjsonwriter_add_string(writer, key); \
    rjsonwriter_raw(writer, ": ", 2)
 
 #define CHEEVOS_JSON_KEY_STR(writer, key, value) \
-   CHEEVOS_JSON_KEY(writer, key); \
-   if (value) rjsonwriter_add_string(writer, value); \
-   else rjsonwriter_raw(writer, "null", 4)
+   CHEEVOS_JSON_KEY(writer, key);                \
+   if (value)                                    \
+      rjsonwriter_add_string(writer, value);     \
+   else                                          \
+      rjsonwriter_raw(writer, "null", 4)
 
-#define CHEEVOS_FREE(p) do { if (p) { free(p); p = NULL; } } while(0)
+#define CHEEVOS_FREE(p) \
+   do                   \
+   {                    \
+      if (p)            \
+      {                 \
+         free(p);       \
+         p = NULL;      \
+      }                 \
+   } while (0)
 
 /************************************************************************
  * JSON Parser Context                                                  *
@@ -42,13 +53,13 @@
 
 typedef struct json_parse_ctx
 {
-   char* current_key;
+   char *current_key;
    unsigned depth;
    unsigned array_depth;
-   void* user_data;
+   void *user_data;
 } json_parse_ctx_t;
 
-static char* json_strdup(const char* s)
+static char *json_strdup(const char *s)
 {
    return s ? strdup(s) : NULL;
 }
@@ -57,10 +68,10 @@ static char* json_strdup(const char* s)
  * Hash Mapping Serialization                                           *
  ************************************************************************/
 
-bool rcheevos_cache_hash_serialize(const rcheevos_cache_hash_t* data, char** json_out)
+bool rcheevos_cache_hash_serialize(const rcheevos_cache_hash_t *data, char **json_out)
 {
-   rjsonwriter_t* writer;
-   char* json;
+   rjsonwriter_t *writer;
+   char *json;
    int len;
 
    if (!data || !json_out)
@@ -87,9 +98,9 @@ bool rcheevos_cache_hash_serialize(const rcheevos_cache_hash_t* data, char** jso
    return false;
 }
 
-bool rcheevos_cache_hash_deserialize(const char* json, rcheevos_cache_hash_t* data_out)
+bool rcheevos_cache_hash_deserialize(const char *json, rcheevos_cache_hash_t *data_out)
 {
-   rjson_t* parser;
+   rjson_t *parser;
    enum rjson_type type;
 
    if (!json || !data_out)
@@ -105,11 +116,11 @@ bool rcheevos_cache_hash_deserialize(const char* json, rcheevos_cache_hash_t* da
    {
       if (type == RJSON_STRING && rjson_get_context_type(parser) == RJSON_OBJECT)
       {
-         const char* key = rjson_get_string(parser, NULL);
+         const char *key = rjson_get_string(parser, NULL);
          type = rjson_next(parser);
 
          if (string_is_equal(key, "game_id") && type == RJSON_NUMBER)
-            data_out->game_id = (uint32_t)rjson_get_int(parser);
+            data_out->game_id = (uint32_t) rjson_get_int(parser);
       }
    }
 
@@ -121,7 +132,7 @@ bool rcheevos_cache_hash_deserialize(const char* json, rcheevos_cache_hash_t* da
  * Game Data Serialization                                              *
  ************************************************************************/
 
-static void serialize_achievement(rjsonwriter_t* writer, const rcheevos_cache_achievement_t* ach)
+static void serialize_achievement(rjsonwriter_t *writer, const rcheevos_cache_achievement_t *ach)
 {
    rjsonwriter_raw(writer, "{\n", 2);
 
@@ -159,16 +170,16 @@ static void serialize_achievement(rjsonwriter_t* writer, const rcheevos_cache_ac
 
    rjsonwriter_raw(writer, "        ", 8);
    CHEEVOS_JSON_KEY(writer, "created");
-   rjsonwriter_rawf(writer, "%lld,\n", (long long)ach->created);
+   rjsonwriter_rawf(writer, "%lld,\n", (long long) ach->created);
 
    rjsonwriter_raw(writer, "        ", 8);
    CHEEVOS_JSON_KEY(writer, "updated");
-   rjsonwriter_rawf(writer, "%lld\n", (long long)ach->updated);
+   rjsonwriter_rawf(writer, "%lld\n", (long long) ach->updated);
 
    rjsonwriter_raw(writer, "      }", 7);
 }
 
-static void serialize_leaderboard(rjsonwriter_t* writer, const rcheevos_cache_leaderboard_t* lb)
+static void serialize_leaderboard(rjsonwriter_t *writer, const rcheevos_cache_leaderboard_t *lb)
 {
    rjsonwriter_raw(writer, "{\n", 2);
 
@@ -203,10 +214,10 @@ static void serialize_leaderboard(rjsonwriter_t* writer, const rcheevos_cache_le
    rjsonwriter_raw(writer, "      }", 7);
 }
 
-bool rcheevos_cache_game_serialize(const rcheevos_cache_game_t* data, char** json_out)
+bool rcheevos_cache_game_serialize(const rcheevos_cache_game_t *data, char **json_out)
 {
-   rjsonwriter_t* writer;
-   char* json;
+   rjsonwriter_t *writer;
+   char *json;
    int len;
    uint32_t i;
 
@@ -242,7 +253,7 @@ bool rcheevos_cache_game_serialize(const rcheevos_cache_game_t* data, char** jso
 
    rjsonwriter_raw(writer, "  ", 2);
    CHEEVOS_JSON_KEY(writer, "cached_at");
-   rjsonwriter_rawf(writer, "%lld,\n", (long long)data->cached_at);
+   rjsonwriter_rawf(writer, "%lld,\n", (long long) data->cached_at);
 
    /* Achievements array */
    rjsonwriter_raw(writer, "  ", 2);
@@ -289,19 +300,19 @@ bool rcheevos_cache_game_serialize(const rcheevos_cache_game_t* data, char** jso
 /* Game data parse context */
 typedef struct game_parse_ctx
 {
-   rcheevos_cache_game_t* game;
+   rcheevos_cache_game_t *game;
    rcheevos_cache_achievement_t current_ach;
    rcheevos_cache_leaderboard_t current_lb;
-   char* current_key;
+   char *current_key;
    unsigned depth;
    bool in_achievements;
    bool in_leaderboards;
    bool in_item;
 } game_parse_ctx_t;
 
-static bool game_parse_string(void* ctx, const char* str, size_t len)
+static bool game_parse_string(void *ctx, const char *str, size_t len)
 {
-   game_parse_ctx_t* pctx = (game_parse_ctx_t*)ctx;
+   game_parse_ctx_t *pctx = (game_parse_ctx_t *) ctx;
 
    if (!pctx->current_key)
       return true;
@@ -341,9 +352,9 @@ static bool game_parse_string(void* ctx, const char* str, size_t len)
    return true;
 }
 
-static bool game_parse_number(void* ctx, const char* str, size_t len)
+static bool game_parse_number(void *ctx, const char *str, size_t len)
 {
-   game_parse_ctx_t* pctx = (game_parse_ctx_t*)ctx;
+   game_parse_ctx_t *pctx = (game_parse_ctx_t *) ctx;
 
    if (!pctx->current_key)
       return true;
@@ -351,51 +362,51 @@ static bool game_parse_number(void* ctx, const char* str, size_t len)
    if (pctx->in_item && pctx->in_achievements)
    {
       if (string_is_equal(pctx->current_key, "id"))
-         pctx->current_ach.id = (uint32_t)strtoul(str, NULL, 10);
+         pctx->current_ach.id = (uint32_t) strtoul(str, NULL, 10);
       else if (string_is_equal(pctx->current_key, "points"))
-         pctx->current_ach.points = (uint32_t)strtoul(str, NULL, 10);
+         pctx->current_ach.points = (uint32_t) strtoul(str, NULL, 10);
       else if (string_is_equal(pctx->current_key, "category"))
-         pctx->current_ach.category = (uint32_t)strtoul(str, NULL, 10);
+         pctx->current_ach.category = (uint32_t) strtoul(str, NULL, 10);
       else if (string_is_equal(pctx->current_key, "created"))
-         pctx->current_ach.created = (time_t)strtoll(str, NULL, 10);
+         pctx->current_ach.created = (time_t) strtoll(str, NULL, 10);
       else if (string_is_equal(pctx->current_key, "updated"))
-         pctx->current_ach.updated = (time_t)strtoll(str, NULL, 10);
+         pctx->current_ach.updated = (time_t) strtoll(str, NULL, 10);
    }
    else if (pctx->in_item && pctx->in_leaderboards)
    {
       if (string_is_equal(pctx->current_key, "id"))
-         pctx->current_lb.id = (uint32_t)strtoul(str, NULL, 10);
+         pctx->current_lb.id = (uint32_t) strtoul(str, NULL, 10);
       else if (string_is_equal(pctx->current_key, "format"))
-         pctx->current_lb.format = (int32_t)strtol(str, NULL, 10);
+         pctx->current_lb.format = (int32_t) strtol(str, NULL, 10);
       else if (string_is_equal(pctx->current_key, "lower_is_better"))
-         pctx->current_lb.lower_is_better = (int)strtol(str, NULL, 10);
+         pctx->current_lb.lower_is_better = (int) strtol(str, NULL, 10);
       else if (string_is_equal(pctx->current_key, "hidden"))
-         pctx->current_lb.hidden = (int)strtol(str, NULL, 10);
+         pctx->current_lb.hidden = (int) strtol(str, NULL, 10);
    }
    else if (pctx->depth == 1)
    {
       if (string_is_equal(pctx->current_key, "id"))
-         pctx->game->id = (uint32_t)strtoul(str, NULL, 10);
+         pctx->game->id = (uint32_t) strtoul(str, NULL, 10);
       else if (string_is_equal(pctx->current_key, "console_id"))
-         pctx->game->console_id = (uint32_t)strtoul(str, NULL, 10);
+         pctx->game->console_id = (uint32_t) strtoul(str, NULL, 10);
       else if (string_is_equal(pctx->current_key, "cached_at"))
-         pctx->game->cached_at = (time_t)strtoll(str, NULL, 10);
+         pctx->game->cached_at = (time_t) strtoll(str, NULL, 10);
    }
 
    return true;
 }
 
-static bool game_parse_object_member(void* ctx, const char* str, size_t len)
+static bool game_parse_object_member(void *ctx, const char *str, size_t len)
 {
-   game_parse_ctx_t* pctx = (game_parse_ctx_t*)ctx;
+   game_parse_ctx_t *pctx = (game_parse_ctx_t *) ctx;
    CHEEVOS_FREE(pctx->current_key);
    pctx->current_key = json_strdup(str);
    return true;
 }
 
-static bool game_parse_start_object(void* ctx)
+static bool game_parse_start_object(void *ctx)
 {
-   game_parse_ctx_t* pctx = (game_parse_ctx_t*)ctx;
+   game_parse_ctx_t *pctx = (game_parse_ctx_t *) ctx;
    pctx->depth++;
 
    if ((pctx->in_achievements || pctx->in_leaderboards) && pctx->depth == 3)
@@ -410,16 +421,16 @@ static bool game_parse_start_object(void* ctx)
    return true;
 }
 
-static bool game_parse_end_object(void* ctx)
+static bool game_parse_end_object(void *ctx)
 {
-   game_parse_ctx_t* pctx = (game_parse_ctx_t*)ctx;
+   game_parse_ctx_t *pctx = (game_parse_ctx_t *) ctx;
 
    if (pctx->in_item && pctx->depth == 3)
    {
       if (pctx->in_achievements && pctx->current_ach.id != 0)
       {
          /* Add achievement to array */
-         rcheevos_cache_achievement_t* new_arr = (rcheevos_cache_achievement_t*)realloc(
+         rcheevos_cache_achievement_t *new_arr = (rcheevos_cache_achievement_t *) realloc(
             pctx->game->achievements,
             (pctx->game->num_achievements + 1) * sizeof(rcheevos_cache_achievement_t));
          if (new_arr)
@@ -432,7 +443,7 @@ static bool game_parse_end_object(void* ctx)
       else if (pctx->in_leaderboards && pctx->current_lb.id != 0)
       {
          /* Add leaderboard to array */
-         rcheevos_cache_leaderboard_t* new_arr = (rcheevos_cache_leaderboard_t*)realloc(
+         rcheevos_cache_leaderboard_t *new_arr = (rcheevos_cache_leaderboard_t *) realloc(
             pctx->game->leaderboards,
             (pctx->game->num_leaderboards + 1) * sizeof(rcheevos_cache_leaderboard_t));
          if (new_arr)
@@ -449,9 +460,10 @@ static bool game_parse_end_object(void* ctx)
    return true;
 }
 
-static bool game_parse_start_array(void* ctx)
+static bool game_parse_start_array(void *ctx)
 {
-   game_parse_ctx_t* pctx = (game_parse_ctx_t*)ctx;
+   game_parse_ctx_t *pctx = (game_parse_ctx_t *) ctx;
+   pctx->depth++;
 
    if (pctx->current_key)
    {
@@ -464,15 +476,15 @@ static bool game_parse_start_array(void* ctx)
    return true;
 }
 
-static bool game_parse_end_array(void* ctx)
+static bool game_parse_end_array(void *ctx)
 {
-   game_parse_ctx_t* pctx = (game_parse_ctx_t*)ctx;
+   game_parse_ctx_t *pctx = (game_parse_ctx_t *) ctx;
    pctx->in_achievements = false;
    pctx->in_leaderboards = false;
    return true;
 }
 
-bool rcheevos_cache_game_deserialize(const char* json, rcheevos_cache_game_t* data_out)
+bool rcheevos_cache_game_deserialize(const char *json, rcheevos_cache_game_t *data_out)
 {
    game_parse_ctx_t ctx;
 
@@ -484,17 +496,17 @@ bool rcheevos_cache_game_deserialize(const char* json, rcheevos_cache_game_t* da
    ctx.game = data_out;
 
    rjson_parse_quick(json, strlen(json), &ctx, 0,
-      game_parse_object_member, game_parse_string, game_parse_number,
-      game_parse_start_object, game_parse_end_object,
-      game_parse_start_array, game_parse_end_array,
-      NULL, NULL, NULL);
+                     game_parse_object_member, game_parse_string, game_parse_number,
+                     game_parse_start_object, game_parse_end_object,
+                     game_parse_start_array, game_parse_end_array,
+                     NULL, NULL, NULL);
 
    CHEEVOS_FREE(ctx.current_key);
 
    return data_out->id != 0;
 }
 
-void rcheevos_cache_game_free(rcheevos_cache_game_t* data)
+void rcheevos_cache_game_free(rcheevos_cache_game_t *data)
 {
    uint32_t i;
 
@@ -539,10 +551,10 @@ void rcheevos_cache_game_free(rcheevos_cache_game_t* data)
  * User Unlocks Serialization                                           *
  ************************************************************************/
 
-bool rcheevos_cache_unlocks_serialize(const rcheevos_cache_user_unlocks_t* data, char** json_out)
+bool rcheevos_cache_unlocks_serialize(const rcheevos_cache_user_unlocks_t *data, char **json_out)
 {
-   rjsonwriter_t* writer;
-   char* json;
+   rjsonwriter_t *writer;
+   char *json;
    int len;
    uint32_t i;
 
@@ -561,7 +573,7 @@ bool rcheevos_cache_unlocks_serialize(const rcheevos_cache_user_unlocks_t* data,
 
    rjsonwriter_raw(writer, "  ", 2);
    CHEEVOS_JSON_KEY(writer, "last_updated");
-   rjsonwriter_rawf(writer, "%lld,\n", (long long)data->last_updated);
+   rjsonwriter_rawf(writer, "%lld,\n", (long long) data->last_updated);
 
    rjsonwriter_raw(writer, "  ", 2);
    CHEEVOS_JSON_KEY(writer, "achievement_ids");
@@ -590,14 +602,14 @@ bool rcheevos_cache_unlocks_serialize(const rcheevos_cache_user_unlocks_t* data,
 /* Unlocks parse context */
 typedef struct unlocks_parse_ctx
 {
-   rcheevos_cache_user_unlocks_t* unlocks;
-   char* current_key;
+   rcheevos_cache_user_unlocks_t *unlocks;
+   char *current_key;
    bool in_array;
 } unlocks_parse_ctx_t;
 
-static bool unlocks_parse_string(void* ctx, const char* str, size_t len)
+static bool unlocks_parse_string(void *ctx, const char *str, size_t len)
 {
-   unlocks_parse_ctx_t* pctx = (unlocks_parse_ctx_t*)ctx;
+   unlocks_parse_ctx_t *pctx = (unlocks_parse_ctx_t *) ctx;
 
    if (pctx->current_key && string_is_equal(pctx->current_key, "username"))
       pctx->unlocks->username = json_strdup(str);
@@ -605,57 +617,57 @@ static bool unlocks_parse_string(void* ctx, const char* str, size_t len)
    return true;
 }
 
-static bool unlocks_parse_number(void* ctx, const char* str, size_t len)
+static bool unlocks_parse_number(void *ctx, const char *str, size_t len)
 {
-   unlocks_parse_ctx_t* pctx = (unlocks_parse_ctx_t*)ctx;
+   unlocks_parse_ctx_t *pctx = (unlocks_parse_ctx_t *) ctx;
 
    if (pctx->in_array)
    {
       /* Add unlock to array */
-      rcheevos_cache_unlock_t* new_arr = (rcheevos_cache_unlock_t*)realloc(
+      rcheevos_cache_unlock_t *new_arr = (rcheevos_cache_unlock_t *) realloc(
          pctx->unlocks->unlocks,
          (pctx->unlocks->num_unlocks + 1) * sizeof(rcheevos_cache_unlock_t));
       if (new_arr)
       {
          pctx->unlocks->unlocks = new_arr;
          pctx->unlocks->unlocks[pctx->unlocks->num_unlocks].achievement_id =
-            (uint32_t)strtoul(str, NULL, 10);
+            (uint32_t) strtoul(str, NULL, 10);
          pctx->unlocks->unlocks[pctx->unlocks->num_unlocks].unlock_time = 0;
          pctx->unlocks->num_unlocks++;
       }
    }
    else if (pctx->current_key && string_is_equal(pctx->current_key, "last_updated"))
    {
-      pctx->unlocks->last_updated = (time_t)strtoll(str, NULL, 10);
+      pctx->unlocks->last_updated = (time_t) strtoll(str, NULL, 10);
    }
 
    return true;
 }
 
-static bool unlocks_parse_object_member(void* ctx, const char* str, size_t len)
+static bool unlocks_parse_object_member(void *ctx, const char *str, size_t len)
 {
-   unlocks_parse_ctx_t* pctx = (unlocks_parse_ctx_t*)ctx;
+   unlocks_parse_ctx_t *pctx = (unlocks_parse_ctx_t *) ctx;
    CHEEVOS_FREE(pctx->current_key);
    pctx->current_key = json_strdup(str);
    return true;
 }
 
-static bool unlocks_parse_start_array(void* ctx)
+static bool unlocks_parse_start_array(void *ctx)
 {
-   unlocks_parse_ctx_t* pctx = (unlocks_parse_ctx_t*)ctx;
+   unlocks_parse_ctx_t *pctx = (unlocks_parse_ctx_t *) ctx;
    if (pctx->current_key && string_is_equal(pctx->current_key, "achievement_ids"))
       pctx->in_array = true;
    return true;
 }
 
-static bool unlocks_parse_end_array(void* ctx)
+static bool unlocks_parse_end_array(void *ctx)
 {
-   unlocks_parse_ctx_t* pctx = (unlocks_parse_ctx_t*)ctx;
+   unlocks_parse_ctx_t *pctx = (unlocks_parse_ctx_t *) ctx;
    pctx->in_array = false;
    return true;
 }
 
-bool rcheevos_cache_unlocks_deserialize(const char* json, rcheevos_cache_user_unlocks_t* data_out)
+bool rcheevos_cache_unlocks_deserialize(const char *json, rcheevos_cache_user_unlocks_t *data_out)
 {
    unlocks_parse_ctx_t ctx;
 
@@ -667,17 +679,17 @@ bool rcheevos_cache_unlocks_deserialize(const char* json, rcheevos_cache_user_un
    ctx.unlocks = data_out;
 
    rjson_parse_quick(json, strlen(json), &ctx, 0,
-      unlocks_parse_object_member, unlocks_parse_string, unlocks_parse_number,
-      NULL, NULL,
-      unlocks_parse_start_array, unlocks_parse_end_array,
-      NULL, NULL, NULL);
+                     unlocks_parse_object_member, unlocks_parse_string, unlocks_parse_number,
+                     NULL, NULL,
+                     unlocks_parse_start_array, unlocks_parse_end_array,
+                     NULL, NULL, NULL);
 
    CHEEVOS_FREE(ctx.current_key);
 
    return true;
 }
 
-void rcheevos_cache_unlocks_free(rcheevos_cache_user_unlocks_t* data)
+void rcheevos_cache_unlocks_free(rcheevos_cache_user_unlocks_t *data)
 {
    if (!data)
       return;
@@ -691,10 +703,10 @@ void rcheevos_cache_unlocks_free(rcheevos_cache_user_unlocks_t* data)
  * Pending Queue Serialization                                          *
  ************************************************************************/
 
-bool rcheevos_cache_pending_serialize(const rcheevos_cache_pending_list_t* data, char** json_out)
+bool rcheevos_cache_pending_serialize(const rcheevos_cache_pending_list_t *data, char **json_out)
 {
-   rjsonwriter_t* writer;
-   char* json;
+   rjsonwriter_t *writer;
+   char *json;
    int len;
    uint32_t i;
 
@@ -709,7 +721,7 @@ bool rcheevos_cache_pending_serialize(const rcheevos_cache_pending_list_t* data,
 
    for (i = 0; i < data->num_entries; i++)
    {
-      const rcheevos_cache_pending_t* entry = &data->entries[i];
+      const rcheevos_cache_pending_t *entry = &data->entries[i];
 
       if (i > 0)
          rjsonwriter_raw(writer, ",\n", 2);
@@ -726,7 +738,7 @@ bool rcheevos_cache_pending_serialize(const rcheevos_cache_pending_list_t* data,
 
       rjsonwriter_raw(writer, "    ", 4);
       CHEEVOS_JSON_KEY(writer, "timestamp");
-      rjsonwriter_rawf(writer, "%lld,\n", (long long)entry->timestamp);
+      rjsonwriter_rawf(writer, "%lld,\n", (long long) entry->timestamp);
 
       rjsonwriter_raw(writer, "    ", 4);
       CHEEVOS_JSON_KEY(writer, "retries");
@@ -768,37 +780,37 @@ bool rcheevos_cache_pending_serialize(const rcheevos_cache_pending_list_t* data,
 /* Pending parse context */
 typedef struct pending_parse_ctx
 {
-   rcheevos_cache_pending_list_t* list;
+   rcheevos_cache_pending_list_t *list;
    rcheevos_cache_pending_t current;
-   char* current_key;
+   char *current_key;
    unsigned depth;
    bool in_object;
 } pending_parse_ctx_t;
 
-static bool pending_parse_number(void* ctx, const char* str, size_t len)
+static bool pending_parse_number(void *ctx, const char *str, size_t len)
 {
-   pending_parse_ctx_t* pctx = (pending_parse_ctx_t*)ctx;
+   pending_parse_ctx_t *pctx = (pending_parse_ctx_t *) ctx;
 
    if (!pctx->in_object || !pctx->current_key)
       return true;
 
    if (string_is_equal(pctx->current_key, "game_id"))
-      pctx->current.game_id = (uint32_t)strtoul(str, NULL, 10);
+      pctx->current.game_id = (uint32_t) strtoul(str, NULL, 10);
    else if (string_is_equal(pctx->current_key, "id"))
-      pctx->current.id = (uint32_t)strtoul(str, NULL, 10);
+      pctx->current.id = (uint32_t) strtoul(str, NULL, 10);
    else if (string_is_equal(pctx->current_key, "timestamp"))
-      pctx->current.timestamp = (time_t)strtoll(str, NULL, 10);
+      pctx->current.timestamp = (time_t) strtoll(str, NULL, 10);
    else if (string_is_equal(pctx->current_key, "retries"))
-      pctx->current.retries = (uint32_t)strtoul(str, NULL, 10);
+      pctx->current.retries = (uint32_t) strtoul(str, NULL, 10);
    else if (string_is_equal(pctx->current_key, "score"))
-      pctx->current.score = (int32_t)strtol(str, NULL, 10);
+      pctx->current.score = (int32_t) strtol(str, NULL, 10);
 
    return true;
 }
 
-static bool pending_parse_boolean(void* ctx, bool value)
+static bool pending_parse_boolean(void *ctx, bool value)
 {
-   pending_parse_ctx_t* pctx = (pending_parse_ctx_t*)ctx;
+   pending_parse_ctx_t *pctx = (pending_parse_ctx_t *) ctx;
 
    if (!pctx->in_object || !pctx->current_key)
       return true;
@@ -811,17 +823,17 @@ static bool pending_parse_boolean(void* ctx, bool value)
    return true;
 }
 
-static bool pending_parse_object_member(void* ctx, const char* str, size_t len)
+static bool pending_parse_object_member(void *ctx, const char *str, size_t len)
 {
-   pending_parse_ctx_t* pctx = (pending_parse_ctx_t*)ctx;
+   pending_parse_ctx_t *pctx = (pending_parse_ctx_t *) ctx;
    CHEEVOS_FREE(pctx->current_key);
    pctx->current_key = json_strdup(str);
    return true;
 }
 
-static bool pending_parse_start_object(void* ctx)
+static bool pending_parse_start_object(void *ctx)
 {
-   pending_parse_ctx_t* pctx = (pending_parse_ctx_t*)ctx;
+   pending_parse_ctx_t *pctx = (pending_parse_ctx_t *) ctx;
    pctx->depth++;
 
    if (pctx->depth == 2)
@@ -833,14 +845,14 @@ static bool pending_parse_start_object(void* ctx)
    return true;
 }
 
-static bool pending_parse_end_object(void* ctx)
+static bool pending_parse_end_object(void *ctx)
 {
-   pending_parse_ctx_t* pctx = (pending_parse_ctx_t*)ctx;
+   pending_parse_ctx_t *pctx = (pending_parse_ctx_t *) ctx;
 
    if (pctx->in_object && pctx->depth == 2)
    {
       /* Add entry to list */
-      rcheevos_cache_pending_t* new_arr = (rcheevos_cache_pending_t*)realloc(
+      rcheevos_cache_pending_t *new_arr = (rcheevos_cache_pending_t *) realloc(
          pctx->list->entries,
          (pctx->list->num_entries + 1) * sizeof(rcheevos_cache_pending_t));
       if (new_arr)
@@ -855,7 +867,7 @@ static bool pending_parse_end_object(void* ctx)
    return true;
 }
 
-bool rcheevos_cache_pending_deserialize(const char* json, rcheevos_cache_pending_list_t* data_out)
+bool rcheevos_cache_pending_deserialize(const char *json, rcheevos_cache_pending_list_t *data_out)
 {
    pending_parse_ctx_t ctx;
 
@@ -867,17 +879,17 @@ bool rcheevos_cache_pending_deserialize(const char* json, rcheevos_cache_pending
    ctx.list = data_out;
 
    rjson_parse_quick(json, strlen(json), &ctx, 0,
-      pending_parse_object_member, NULL, pending_parse_number,
-      pending_parse_start_object, pending_parse_end_object,
-      NULL, NULL,
-      pending_parse_boolean, NULL, NULL);
+                     pending_parse_object_member, NULL, pending_parse_number,
+                     pending_parse_start_object, pending_parse_end_object,
+                     NULL, NULL,
+                     pending_parse_boolean, NULL, NULL);
 
    CHEEVOS_FREE(ctx.current_key);
 
    return true;
 }
 
-void rcheevos_cache_pending_free(rcheevos_cache_pending_list_t* data)
+void rcheevos_cache_pending_free(rcheevos_cache_pending_list_t *data)
 {
    if (!data)
       return;

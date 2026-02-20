@@ -214,7 +214,6 @@ int rc_api_process_fetch_game_data_response(rc_api_fetch_game_data_response_t *r
          if (!rc_json_get_required_string(&achievement->definition, &response->response,
                                           &achievement_fields[5], "MemAddr"))
             return RC_MISSING_VALUE;
-         printf("Achievement definition: %s\n", achievement->definition);
          if (!rc_json_get_required_string(&achievement->badge_name, &response->response,
                                           &achievement_fields[7], "BadgeName"))
             return RC_MISSING_VALUE;
