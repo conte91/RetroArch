@@ -67,6 +67,10 @@
 /* Keep consistent with SERVER_PING_FREQUENCY from RAIntegration. */
 #define CHEEVOS_PING_FREQUENCY 2 * 60 * 1000000
 
+/* Number of usecs to wait between posting rich presence to the site. */
+/* Keep consistent with SERVER_PING_FREQUENCY from RAIntegration. */
+#define CHEEVOS_NETWORK_POLL_FREQUENCY 60 * 1000000
+
 #define CHEEVOS_CACHE_EXPIRATION_SEC (60 * 100000)
 #define CHEEVOS_UNLOCKS_CACHE_EXPIRATION_SEC (60 * 5)
 
@@ -85,7 +89,8 @@ enum rcheevos_async_io_type
    CHEEVOS_ASYNC_FETCH_USER_UNLOCKS,
    CHEEVOS_ASYNC_FETCH_HARDCORE_USER_UNLOCKS,
    CHEEVOS_ASYNC_START_SESSION,
-   CHEEVOS_ASYNC_FETCH_BADGE
+   CHEEVOS_ASYNC_FETCH_BADGE,
+   CHEEVOS_ASYNC_NETWORK_POLL,
 };
 
 struct rcheevos_async_io_request;
@@ -682,11 +687,11 @@ static void rcheevos_client_login_callback(void *userdata)
               sizeof(rcheevos_locals->displayname));
       strlcpy(rcheevos_locals->username, data->username, sizeof(rcheevos_locals->username));
       rcheevos_locals->token[0] = '\0';
-      rcheevos_locals->local_only = true;
+      rcheevos_locals->logged_in = false;
    }
    else
    {
-      rcheevos_locals->local_only = false;
+      rcheevos_locals->logged_in = true;
    }
    if (data->callback)
    {
@@ -1491,7 +1496,7 @@ static void rcheevos_client_start_fetch_game_data(rcheevos_async_initialize_runt
          rcheevos_fetch_game_data_done(data, true);
          return;
       }
-      else if (rcheevos_locals->local_only)
+      else if (rcheevos_locals->logged_in)
       {
          CHEEVOS_LOG(RCHEEVOS_TAG "No network available; falling back to cached data.\n");
          rcheevos_fetch_game_data_done(data, true);
@@ -1597,7 +1602,7 @@ static void rcheevos_client_start_fetch_user_unlocks(int hardcore, rcheevos_asyn
          data->unlock_fetch_status[hardcore] = CHEEVOS_ASYNC_STATUS_SUCCESS;
          return;
       }
-      else if (rcheevos_locals->local_only)
+      else if (!rcheevos_locals->logged_in)
       {
          CHEEVOS_LOG(RCHEEVOS_TAG "No network available; falling back to cached user unlock data.\n");
          data->unlock_fetch_status[hardcore] = CHEEVOS_ASYNC_STATUS_SUCCESS;
@@ -1734,9 +1739,88 @@ static retro_time_t rcheevos_client_prepare_ping(rcheevos_async_io_request *requ
    return cpu_features_get_time_usec() + CHEEVOS_PING_FREQUENCY * 2;
 }
 
+/** Callback data for rcheevos_async_network_state_poll_handler */
+typedef struct
+{
+   bool online;
+   rcheevos_async_io_request *net_poll_request; // NULL when not online, non-null and has valid user agent when online.
+   rcheevos_async_io_request *ping_request;     // This is initialized once if the initial login is successful. Otherwise it's always NULL.
+   unsigned game_id;
+
+   // TODO(future): these should be locked with a mutex
+   bool pending_sync_request;
+   unsigned int *pending_achievement_queue;
+   int pending_achievement_queue_size;
+} rcheevos_async_network_state_poll_state_t;
+
+static void rcheevos_poll_dispatch_pending_achievements(rcheevos_async_network_state_poll_state_t *state)
+{
+   /// TODO ///
+   /// @claude
+   if (state->pending_sync_request)
+   {
+      return; // Don't queue more pending requests if some are still ongoing
+   }
+   /// Here, we check pending_achievement_queue.
+   /// - If empty: we refresh the list of pending achievements into pending_achievement_queue.
+   ///    - Then continue to next step
+   /// - If non empty, we set pending_sync_request and spawn a task that "awards" the next achievement in the list.
+   ///   - The pending achievement callback will, on success, move on to the next achievement. on failure or no achievement left, reset pending_sync_request.
+}
+
+static void rcheevos_async_network_state_poll_handler(retro_task_t *task)
+{
+   rcheevos_async_network_state_poll_state_t *state = (rcheevos_async_network_state_poll_state_t *) task->user_data;
+
+   const rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
+   if (state->game_id != rcheevos_locals->game.id)
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "Stopping periodic rich presence update task for game %u\n",
+                  state->net_poll_request->id);
+      /* game changed; stop the recurring task - a new one will
+     * be scheduled if a new game is loaded */
+      task_set_finished(task, 1);
+      /* request->request was destroyed
+     * in rcheevos_async_http_task_callback */
+      free(state->net_poll_request);
+      state->net_poll_request = NULL;
+      return;
+   }
+   if (state->online)
+   {
+      rcheevos_poll_dispatch_pending_achievements(state);
+   }
+
+   /* Set the task to fire again */
+   task->when = cpu_features_get_time_usec() + CHEEVOS_NETWORK_POLL_FREQUENCY;
+
+   /* Start the HTTP request */
+   rcheevos_async_begin_http_request(state->net_poll_request);
+}
+
+static void rcheevos_async_ping_callback(struct rcheevos_async_io_request *request,
+                                         http_transfer_data_t *data, char buffer[],
+                                         size_t buffer_size,
+                                         void *handler_data)
+{
+   rcheevos_async_network_state_poll_state_t *state = (rcheevos_async_network_state_poll_state_t *) handler_data;
+   if (data->status != 200)
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "Ping succeeded for game %u :)\n", request->id);
+      state->online = true;
+      return;
+   }
+
+   // Network temporarily down. Will retry.
+   CHEEVOS_LOG(RCHEEVOS_TAG "Ping failed for game %u :( code: %d\n", data->status);
+   state->online = false;
+}
+
+/** Periodic callback that sends keepalive pings to the server. */
 static void rcheevos_async_ping_handler(retro_task_t *task)
 {
-   rcheevos_async_io_request *request = (rcheevos_async_io_request *) task->user_data;
+   rcheevos_async_network_state_poll_state_t *state = (rcheevos_async_network_state_poll_state_t *) task->user_data;
+   rcheevos_async_io_request *request = state->ping_request;
 
    const rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
    if (request->id != (int) rcheevos_locals->game.id)
@@ -1775,14 +1859,43 @@ static void rcheevos_async_start_session_callback(struct rcheevos_async_io_reque
    rc_api_destroy_start_session_response(&api_response);
 }
 
-void rcheevos_client_start_session(unsigned game_id)
+static void rcheevos_client_start_network_state_poll(unsigned game_id, rcheevos_async_network_state_poll_state_t *state)
 {
    rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
-   if (rcheevos_locals->local_only)
+   retro_task_t *task = task_init();
+
+   task->handler = rcheevos_async_network_state_poll_handler;
+   task->user_data = state;
+   task->progress = -1;
+   task->when = cpu_features_get_time_usec();
+
+   CHEEVOS_LOG(RCHEEVOS_TAG "Starting network state poll for %u\n", game_id);
+   task_queue_push(task);
+}
+
+void rcheevos_client_start_session(unsigned game_id)
+{
+   rcheevos_async_network_state_poll_state_t *state =
+      (rcheevos_async_network_state_poll_state_t *) calloc(1, sizeof(*state));
+   if (!state)
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "Failed to allocate network poll state\n");
+      return;
+   }
+   rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
+
+   state->online = rcheevos_locals->logged_in;
+   state->game_id = game_id;
+   state->net_poll_request = NULL;
+   state->ping_request = NULL;
+
+   if (!rcheevos_locals->logged_in)
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "Not logged in to retroachievements: will not start session.\n");
       return;
    }
+
+   rcheevos_client_start_network_state_poll(game_id, state);
 
    /* the core won't change while a session is active, so only
    * calculate the user agent once */
@@ -1791,9 +1904,9 @@ void rcheevos_client_start_session(unsigned game_id)
 
    /* schedule the first rich presence call in 30 seconds */
    {
-      rcheevos_async_io_request *request =
+      state->ping_request =
          (rcheevos_async_io_request *) calloc(1, sizeof(rcheevos_async_io_request));
-      if (!request)
+      if (!state->ping_request)
       {
          CHEEVOS_LOG(RCHEEVOS_TAG "Failed to allocate rich presence request\n");
       }
@@ -1801,13 +1914,15 @@ void rcheevos_client_start_session(unsigned game_id)
       {
          retro_task_t *task = task_init();
 
-         request->id = game_id;
-         request->type = CHEEVOS_ASYNC_RICHPRESENCE;
-         request->user_agent = rcheevos_locals->user_agent_core;
-         request->failure_message = "Error sending ping";
+         state->ping_request->id = game_id;
+         state->ping_request->type = CHEEVOS_ASYNC_RICHPRESENCE;
+         state->ping_request->user_agent = rcheevos_locals->user_agent_core;
+         state->ping_request->failure_message = "Error sending ping";
 
+         state->ping_request->handler = rcheevos_async_ping_callback;
+         state->ping_request->handler_data = state;
          task->handler = rcheevos_async_ping_handler;
-         task->user_data = request;
+         task->user_data = state;
          task->progress = -1;
          task->when = cpu_features_get_time_usec() + CHEEVOS_PING_FREQUENCY / 4;
 
@@ -2290,42 +2405,40 @@ void rcheevos_client_award_achievement(unsigned achievement_id)
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "Failed to allocate unlock request for achievement %u\n",
                   achievement_id);
+      return;
    }
-   else
+   const rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
+   rc_api_award_achievement_request_t api_params;
+   int result;
+
+   memset(&api_params, 0, sizeof(api_params));
+   api_params.username = rcheevos_locals->username;
+   api_params.api_token = rcheevos_locals->token;
+   api_params.achievement_id = achievement_id;
+   api_params.achievement_id = achievement_id;
+   api_params.hardcore = rcheevos_locals->hardcore_active ? 1 : 0;
+   api_params.game_hash = rcheevos_locals->game.hash;
+
+   result = rc_api_init_award_achievement_request(&request->request, &api_params);
+
+   rcheevos_client_award_achievement_callback_data_t *cb_data = calloc(1, sizeof(*cb_data));
+   if (!cb_data)
    {
-      const rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
-      rc_api_award_achievement_request_t api_params;
-      int result;
-
-      memset(&api_params, 0, sizeof(api_params));
-      api_params.username = rcheevos_locals->username;
-      api_params.api_token = rcheevos_locals->token;
-      api_params.achievement_id = achievement_id;
-      api_params.achievement_id = achievement_id;
-      api_params.hardcore = rcheevos_locals->hardcore_active ? 1 : 0;
-      api_params.game_hash = rcheevos_locals->game.hash;
-
-      result = rc_api_init_award_achievement_request(&request->request, &api_params);
-
-      rcheevos_client_award_achievement_callback_data_t *cb_data = calloc(1, sizeof(*cb_data));
-      if (!cb_data)
-      {
-         CHEEVOS_ERR(RCHEEVOS_TAG "Failed to allocate callback context for rcheevos_async_award_achievement_callback\n.");
-         free(request);
-         return;
-      }
-      cb_data->achievement_id = achievement_id;
-      cb_data->username = strdup(rcheevos_locals->username);
-      cb_data->game_id = rcheevos_locals->game.id;
-      cb_data->hardcore = rcheevos_locals->hardcore_active ? 1 : 0;
-      cb_data->timestamp = time(NULL);
-      request->callback = rcheevos_client_award_achievement_callback;
-      request->callback_data = cb_data;
-
-      rcheevos_async_begin_request(request, result, rcheevos_async_award_achievement_callback, cb_data,
-                                   CHEEVOS_ASYNC_AWARD_ACHIEVEMENT, achievement_id,
-                                   "Awarded achievement", "Error awarding achievement");
+      CHEEVOS_ERR(RCHEEVOS_TAG "Failed to allocate callback context for rcheevos_async_award_achievement_callback\n.");
+      free(request);
+      return;
    }
+   cb_data->achievement_id = achievement_id;
+   cb_data->username = strdup(rcheevos_locals->username);
+   cb_data->game_id = rcheevos_locals->game.id;
+   cb_data->hardcore = rcheevos_locals->hardcore_active ? 1 : 0;
+   cb_data->timestamp = time(NULL);
+   request->callback = rcheevos_client_award_achievement_callback;
+   request->callback_data = cb_data;
+
+   rcheevos_async_begin_request(request, result, rcheevos_async_award_achievement_callback, cb_data,
+                                CHEEVOS_ASYNC_AWARD_ACHIEVEMENT, achievement_id,
+                                "Awarded achievement", "Error awarding achievement");
 }
 
 /****************************

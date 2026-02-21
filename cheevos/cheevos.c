@@ -828,10 +828,6 @@ bool rcheevos_unload(void)
       rcheevos_locals.hardcore_active = false;
 
       rc_libretro_hash_set_destroy(&rcheevos_locals.game.hashes);
-
-      /* Reset cache state for current game */
-      rcheevos_locals.loaded_from_cache = false;
-      rcheevos_locals.cache_game_id = 0;
    }
 
 #ifdef HAVE_THREADS
@@ -1919,7 +1915,7 @@ static void rcheevos_fetch_game_data(void)
    if (rcheevos_locals.load_info.state == RCHEEVOS_LOAD_STATE_NETWORK_ERROR)
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "No remove achievements available.\n");
-      rcheevos_locals.local_only = true;
+      rcheevos_locals.logged_in = true;
    }
 
    if (!rcheevos_locals.token[0])
@@ -2338,14 +2334,6 @@ bool rcheevos_load(const void *data)
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "FETCHING\n");
       rcheevos_fetch_game_data();
-
-      /* Initialize offline cache if enabled */
-      if (settings->bools.cheevos_cache_enabled)
-      {
-         rcheevos_locals.cache_initialized = true; // TODO
-         if (rcheevos_locals.cache_initialized)
-            CHEEVOS_LOG(RCHEEVOS_TAG "Offline cache initialized\n");
-      }
    }
    else
    {
@@ -2394,10 +2382,6 @@ static void rcheevos_identify_game_disc_callback(void *userdata)
          rcheevos_pause_hardcore();
       }
    }
-
-   /* Reset per-game cache state */
-   rcheevos_locals.loaded_from_cache = false;
-   rcheevos_locals.cache_game_id = 0;
 
    /* disc is valid, add it to the known disk list */
    rc_libretro_hash_set_add(&rcheevos_locals.game.hashes,
