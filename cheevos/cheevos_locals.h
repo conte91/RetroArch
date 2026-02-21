@@ -78,6 +78,7 @@ typedef struct rcheevos_racheevo_t
 
   retro_time_t unlock_time;
   uint8_t active;
+  uint8_t synced_active;
 
 #ifdef HAVE_MENU
   uint8_t menu_bucket;
@@ -153,6 +154,7 @@ typedef struct rcheevos_game_info_t
 
    unsigned achievement_count;
    unsigned leaderboard_count;
+   unsigned pending_achievement_count;
 
 } rcheevos_game_info_t;
 

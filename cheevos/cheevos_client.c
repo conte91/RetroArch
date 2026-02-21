@@ -613,8 +613,8 @@ void rcheevos_client_initialize(void)
       //host = "https://peppino.usuraio.org";
       host = "https://retroachievements.org";
 #else
-      //host = "http://peppino.usuraio.org";
-      host = "http://retroachievements.org";
+      host = "http://peppino.usuraio.org";
+      //host = "http://retroachievements.org";
 #endif
    }
 

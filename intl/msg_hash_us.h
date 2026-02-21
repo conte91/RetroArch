@@ -10230,6 +10230,10 @@ MSG_HASH(
    "Active Challenges"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_CHEEVOS_NEED_SYNC_ENTRY,
+   "Needs online sync"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_CHEEVOS_TRACKERS_ONLY,
    "Trackers Only"
    )
@@ -15335,3 +15339,19 @@ MSG_HASH(
    MSG_IOS_TOUCH_MOUSE_DISABLED,
    "Touch mouse is disabled"
    )
+MSG_HASH(
+      MENU_ENUM_LABEL_VALUE_OFFLINE_MODE_USING_CACHED_DATA,
+      "⚡ Offline Mode - Using cached data"
+      )
+MSG_HASH(
+      MENU_ENUM_LABEL_VALUE_OFFLINE_NO_ACHIEVEMENT_DATA_AVAILABLE,
+      "⚠ Offline - No achievement data available"
+      )
+MSG_HASH(
+      MENU_ENUM_LABEL_VALUE_ONLINE_ACHIEVEMENT_PENDING_SYNC,
+                  "↻ Online - pending achievement(s) sync";
+      )
+MSG_HASH(
+      MENU_ENUM_LABEL_VALUE_ONLINE_SYNCED,
+                   "✓ Online - Synced";
+      )
