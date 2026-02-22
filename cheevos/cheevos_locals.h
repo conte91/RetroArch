@@ -20,6 +20,8 @@
 #include "../deps/rcheevos/include/rc_runtime.h"
 #include "../deps/rcheevos/src/rcheevos/rc_libretro.h"
 
+#include "cheevos_cache_data.h"
+
 #include <boolean.h>
 #include <queues/task_queue.h>
 
@@ -205,6 +207,9 @@ typedef struct rcheevos_locals_t
    bool leaderboards_enabled;         /* leaderboards are enabled */
    bool leaderboard_notifications;    /* leaderboard notifications are enabled */
    bool leaderboard_trackers;         /* leaderboard trackers are enabled */
+
+   rcheevos_cache_pending_t *pending_achievement_queue; /* in-memory snapshot of pending.json */
+   int pending_achievement_queue_size;
 } rcheevos_locals_t;
 
 rcheevos_locals_t* get_rcheevos_locals(void);
