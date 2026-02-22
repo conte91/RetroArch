@@ -414,7 +414,7 @@ static void rcheevos_menu_add_status_line(file_list_t *list)
    const char *status;
    int label;
 
-   if (locals->local_only)
+   if (!locals->logged_in)
    {
       if (locals->loaded)
       {
@@ -429,7 +429,7 @@ static void rcheevos_menu_add_status_line(file_list_t *list)
    }
    else
    {
-      if (locals->game.pending_achievement_count > 0)
+      if (locals->game.needs_sync)
       {
          status = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_ONLINE_ACHIEVEMENT_PENDING_SYNC);
          label = MENU_ENUM_LABEL_ONLINE_ACHIEVEMENT_PENDING_SYNC;

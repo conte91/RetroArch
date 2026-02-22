@@ -691,6 +691,7 @@ static void rcheevos_client_login_callback(void *userdata)
    }
    else
    {
+      CHEEVOS_LOG(RCHEEVOS_TAG "Successful login for  `%s` :)\n", data->username);
       rcheevos_locals->logged_in = true;
    }
    if (data->callback)
@@ -1496,7 +1497,7 @@ static void rcheevos_client_start_fetch_game_data(rcheevos_async_initialize_runt
          rcheevos_fetch_game_data_done(data, true);
          return;
       }
-      else if (rcheevos_locals->logged_in)
+      else if (!rcheevos_locals->logged_in)
       {
          CHEEVOS_LOG(RCHEEVOS_TAG "No network available; falling back to cached data.\n");
          rcheevos_fetch_game_data_done(data, true);
@@ -1743,29 +1744,199 @@ static retro_time_t rcheevos_client_prepare_ping(rcheevos_async_io_request *requ
 typedef struct
 {
    bool online;
-   rcheevos_async_io_request *net_poll_request; // NULL when not online, non-null and has valid user agent when online.
-   rcheevos_async_io_request *ping_request;     // This is initialized once if the initial login is successful. Otherwise it's always NULL.
+   rcheevos_async_io_request *net_poll_request; /* NULL when not online, non-null and has valid user agent when online. */
+   rcheevos_async_io_request *ping_request;     /* Initialized once on successful login, NULL otherwise. */
    unsigned game_id;
 
-   // TODO(future): these should be locked with a mutex
+   /* TODO(future): these should be locked with a mutex */
    bool pending_sync_request;
-   unsigned int *pending_achievement_queue;
+   rcheevos_cache_pending_t *pending_achievement_queue; /* In-memory snapshot of pending.json entries */
    int pending_achievement_queue_size;
 } rcheevos_async_network_state_poll_state_t;
 
+/** Callback data for a single pending achievement/leaderboard sync attempt */
+typedef struct
+{
+   rcheevos_async_network_state_poll_state_t *state; /* to reset pending_sync_request */
+   char *username;
+   uint32_t entry_id;
+   bool is_leaderboard;
+   bool award_success;
+} rcheevos_pending_sync_cb_data_t;
+
+/* Forward declaration - rcheevos_client_award_pending_callback chains back into this */
+static void rcheevos_poll_dispatch_pending_achievements(rcheevos_async_network_state_poll_state_t *state);
+
+/** Reads pending.json into the poll state and updates game.needs_sync accordingly.
+ *  Called at session start and after each successful sync to keep state current. */
+static void rcheevos_sync_pending_state(
+   rcheevos_async_network_state_poll_state_t *state,
+   const char *username)
+{
+   rcheevos_cache_pending_list_t pending;
+   rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
+
+   free(state->pending_achievement_queue);
+   state->pending_achievement_queue = NULL;
+   state->pending_achievement_queue_size = 0;
+   rcheevos_locals->game.needs_sync = false;
+
+   if (!rcheevos_cache_get_pending_unlocks(username, &pending))
+      return;
+
+   if (pending.num_entries > 0)
+   {
+      /* rcheevos_cache_pending_t has no pointer fields, so memcpy is safe */
+      state->pending_achievement_queue = (rcheevos_cache_pending_t *)
+         calloc(pending.num_entries, sizeof(*state->pending_achievement_queue));
+      if (state->pending_achievement_queue)
+      {
+         memcpy(state->pending_achievement_queue, pending.entries,
+                pending.num_entries * sizeof(rcheevos_cache_pending_t));
+         state->pending_achievement_queue_size = (int) pending.num_entries;
+         rcheevos_locals->game.needs_sync = true;
+         CHEEVOS_LOG(RCHEEVOS_TAG "Loaded %d pending entries for sync.\n",
+                     state->pending_achievement_queue_size);
+      }
+   }
+
+   rcheevos_cache_pending_free(&pending);
+}
+
+static void rcheevos_async_award_pending_callback(
+   struct rcheevos_async_io_request *request,
+   http_transfer_data_t *data, char buffer[],
+   size_t buffer_size, void *handler_data)
+{
+   rc_api_award_achievement_response_t api_response;
+   rcheevos_pending_sync_cb_data_t *cb_data =
+      (rcheevos_pending_sync_cb_data_t *) handler_data;
+
+   int result = rc_api_process_award_achievement_response(&api_response, data->data);
+   if (rcheevos_async_succeeded(result, &api_response.response, buffer, buffer_size))
+      cb_data->award_success = true;
+
+   rc_api_destroy_award_achievement_response(&api_response);
+}
+
+static void rcheevos_register_achievement_unlocked(const char *username, uint64_t game_id, bool hardcore, unsigned int awarded_achievement, unsigned int achievements_remaining)
+{
+   /* Update cache if available */
+   if (achievements_remaining == 0)
+   {
+      rcheevos_show_mastery_placard();
+   }
+   rcheevos_cache_user_unlocks_t cached_unlocks;
+   if (rcheevos_cache_get_user_unlocks(username, game_id, hardcore, &cached_unlocks))
+   {
+      // Update cache accordingly
+      cached_unlocks.unlocks = reallocarray(cached_unlocks.unlocks, cached_unlocks.num_unlocks + 1, sizeof(*cached_unlocks.unlocks));
+      cached_unlocks.num_unlocks++;
+      rcheevos_cache_save_user_unlocks(username, game_id, hardcore, &cached_unlocks);
+   }
+}
+
+static void rcheevos_client_award_pending_callback(void *userdata)
+{
+   rcheevos_pending_sync_cb_data_t *cb_data =
+      (rcheevos_pending_sync_cb_data_t *) userdata;
+
+   cb_data->state->pending_sync_request = false;
+
+   if (cb_data->award_success)
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "Pending %s %u synced to server.\n",
+                  cb_data->is_leaderboard ? "leaderboard" : "achievement", cb_data->entry_id);
+      rcheevos_cache_remove_pending_unlock(cb_data->username,
+                                           cb_data->entry_id, cb_data->is_leaderboard);
+      rcheevos_register_achievement_unlocked();
+      cb_data->state->pending_achievement_queue_size--;
+      /* Only re-read disk when the in-memory batch is exhausted */
+      if (cb_data->state->pending_achievement_queue_size == 0)
+         rcheevos_sync_pending_state(cb_data->state, cb_data->username);
+      rcheevos_poll_dispatch_pending_achievements(cb_data->state);
+   }
+   else
+   {
+      /* Network or server error - keep entry in queue, retry on next poll cycle */
+      CHEEVOS_LOG(RCHEEVOS_TAG "Failed to sync pending %s %u, will retry.\n",
+                  cb_data->is_leaderboard ? "leaderboard" : "achievement", cb_data->entry_id);
+   }
+
+   free(cb_data->username);
+   free(cb_data);
+}
+
+static void rcheevos_client_dispatch_pending_entry(
+   rcheevos_async_network_state_poll_state_t *state,
+   const rcheevos_locals_t *rcheevos_locals,
+   const rcheevos_cache_pending_t *entry)
+{
+   rcheevos_async_io_request *request;
+   rcheevos_pending_sync_cb_data_t *cb_data;
+
+   if (entry->is_leaderboard)
+   {
+      /* Leaderboard pending sync not yet implemented - skip this entry */
+      CHEEVOS_LOG(RCHEEVOS_TAG "Skipping pending leaderboard %u (not yet implemented).\n", entry->id);
+      state->pending_achievement_queue_size--;
+      return;
+   }
+
+   request = (rcheevos_async_io_request *) calloc(1, sizeof(rcheevos_async_io_request));
+   if (!request)
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "Failed to allocate request for pending achievement %u\n", entry->id);
+      return;
+   }
+
+   cb_data = (rcheevos_pending_sync_cb_data_t *) calloc(1, sizeof(*cb_data));
+   if (!cb_data)
+   {
+      free(request);
+      return;
+   }
+
+   cb_data->state = state;
+   cb_data->username = strdup(rcheevos_locals->username);
+   cb_data->entry_id = entry->id;
+   cb_data->is_leaderboard = false;
+   cb_data->award_success = false;
+
+   request->callback = rcheevos_client_award_pending_callback;
+   request->callback_data = cb_data;
+
+   {
+      rc_api_award_achievement_request_t api_params;
+      int result;
+
+      memset(&api_params, 0, sizeof(api_params));
+      api_params.username = rcheevos_locals->username;
+      api_params.api_token = rcheevos_locals->token;
+      api_params.achievement_id = entry->id;
+      api_params.hardcore = entry->hardcore ? 1 : 0;
+      api_params.game_hash = ""; /* not stored in pending queue */
+
+      result = rc_api_init_award_achievement_request(&request->request, &api_params);
+      /* Set flag before begin_request: on immediate failure begin_request calls
+       * rcheevos_async_end_request synchronously which calls our callback which
+       * resets the flag, so the ordering is always consistent. */
+      state->pending_sync_request = true;
+      rcheevos_async_begin_request(request, result,
+                                   rcheevos_async_award_pending_callback, cb_data,
+                                   CHEEVOS_ASYNC_AWARD_ACHIEVEMENT, (int) entry->id,
+                                   "Synced pending achievement", "Error syncing pending achievement");
+   }
+}
+
 static void rcheevos_poll_dispatch_pending_achievements(rcheevos_async_network_state_poll_state_t *state)
 {
-   /// TODO ///
-   /// @claude
-   if (state->pending_sync_request)
-   {
-      return; // Don't queue more pending requests if some are still ongoing
-   }
-   /// Here, we check pending_achievement_queue.
-   /// - If empty: we refresh the list of pending achievements into pending_achievement_queue.
-   ///    - Then continue to next step
-   /// - If non empty, we set pending_sync_request and spawn a task that "awards" the next achievement in the list.
-   ///   - The pending achievement callback will, on success, move on to the next achievement. on failure or no achievement left, reset pending_sync_request.
+   if (state->pending_sync_request || state->pending_achievement_queue_size == 0)
+      return;
+
+   /* Dispatch from the tail for O(1) removal via size decrement */
+   rcheevos_client_dispatch_pending_entry(state, get_rcheevos_locals(),
+                                          &state->pending_achievement_queue[state->pending_achievement_queue_size - 1]);
 }
 
 static void rcheevos_async_network_state_poll_handler(retro_task_t *task)
@@ -1793,9 +1964,6 @@ static void rcheevos_async_network_state_poll_handler(retro_task_t *task)
 
    /* Set the task to fire again */
    task->when = cpu_features_get_time_usec() + CHEEVOS_NETWORK_POLL_FREQUENCY;
-
-   /* Start the HTTP request */
-   rcheevos_async_begin_http_request(state->net_poll_request);
 }
 
 static void rcheevos_async_ping_callback(struct rcheevos_async_io_request *request,
@@ -1875,19 +2043,7 @@ static void rcheevos_client_start_network_state_poll(unsigned game_id, rcheevos_
 
 void rcheevos_client_start_session(unsigned game_id)
 {
-   rcheevos_async_network_state_poll_state_t *state =
-      (rcheevos_async_network_state_poll_state_t *) calloc(1, sizeof(*state));
-   if (!state)
-   {
-      CHEEVOS_LOG(RCHEEVOS_TAG "Failed to allocate network poll state\n");
-      return;
-   }
    rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
-
-   state->online = rcheevos_locals->logged_in;
-   state->game_id = game_id;
-   state->net_poll_request = NULL;
-   state->ping_request = NULL;
 
    if (!rcheevos_locals->logged_in)
    {
@@ -1895,6 +2051,19 @@ void rcheevos_client_start_session(unsigned game_id)
       return;
    }
 
+   rcheevos_async_network_state_poll_state_t *state =
+      (rcheevos_async_network_state_poll_state_t *) calloc(1, sizeof(*state));
+   if (!state)
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "Failed to allocate network poll state\n");
+      return;
+   }
+   state->online = true;
+   state->game_id = game_id;
+   state->net_poll_request = NULL;
+   state->ping_request = NULL;
+
+   rcheevos_sync_pending_state(state, rcheevos_locals->username);
    rcheevos_client_start_network_state_poll(game_id, state);
 
    /* the core won't change while a session is active, so only
@@ -2294,23 +2463,6 @@ void rcheevos_client_fetch_badges(rcheevos_client_callback callback, void *userd
  * award achievement        *
  ****************************/
 
-static void rcheevos_register_achievement_unlocked(const char *username, uint64_t game_id, bool hardcore, unsigned int awarded_achievement, unsigned int achievements_remaining)
-{
-   /* Update cache if available */
-   if (achievements_remaining == 0)
-   {
-      rcheevos_show_mastery_placard();
-   }
-   rcheevos_cache_user_unlocks_t cached_unlocks;
-   if (rcheevos_cache_get_user_unlocks(username, game_id, hardcore, &cached_unlocks))
-   {
-      // Update cache accordingly
-      cached_unlocks.unlocks = reallocarray(cached_unlocks.unlocks, cached_unlocks.num_unlocks + 1, sizeof(*cached_unlocks.unlocks));
-      cached_unlocks.num_unlocks++;
-      rcheevos_cache_save_user_unlocks(username, game_id, hardcore, &cached_unlocks);
-   }
-}
-
 static void rcheevos_queue_achievement_sync(const char *username, uint64_t game_id, unsigned int achievement_id, bool hardcore, bool is_leaderboard, unsigned int score, time_t timestamp)
 {
    rcheevos_cache_pending_list_t pending;
@@ -2345,7 +2497,10 @@ typedef struct rcheevos_async_award_achievement_callback_data_t
    bool is_leaderboard;
    unsigned int score;
    time_t timestamp;
+
    bool award_success;
+   unsigned int awarded_achievement_id;
+   int awarded_achievement_remaining; // Only valid if `award_success`
 } rcheevos_client_award_achievement_callback_data_t;
 
 void rcheevos_client_award_achievement_callback_data_free(rcheevos_client_award_achievement_callback_data_t *data)
@@ -2377,8 +2532,9 @@ static void rcheevos_async_award_achievement_callback(struct rcheevos_async_io_r
          CHEEVOS_LOG(RCHEEVOS_TAG "Achievement %u: %s\n", request->id,
                      api_response.response.error_message);
       }
-      rcheevos_register_achievement_unlocked(cb_data->username, cb_data->game_id, cb_data->hardcore, api_response.awarded_achievement_id, api_response.achievements_remaining);
       cb_data->award_success = true;
+      cb_data->awarded_achievement_id = api_response.awarded_achievement_id;
+      cb_data->awarded_achievement_remaining = api_response.achievements_remaining;
    }
 
    rc_api_destroy_award_achievement_response(&api_response);
@@ -2387,11 +2543,15 @@ static void rcheevos_async_award_achievement_callback(struct rcheevos_async_io_r
 void rcheevos_client_award_achievement_callback(void *userdata)
 {
    rcheevos_client_award_achievement_callback_data_t *cb_data = (rcheevos_client_award_achievement_callback_data_t *) userdata;
-   if (!cb_data->award_success)
+   if (cb_data->award_success)
+   {
+      CHEEVOS_LOG(RCHEEVOS_TAG "Achievement %u successfully registered.\n", cb_data->achievement_id);
+      rcheevos_register_achievement_unlocked(cb_data->username, cb_data->game_id, cb_data->hardcore, cb_data->awarded_achievement_id, cb_data->awarded_achievement_remaining);
+   }
+   else
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "Queueing achievement %u in unlock cache.\n", cb_data->achievement_id);
       rcheevos_queue_achievement_sync(cb_data->username, cb_data->game_id, cb_data->achievement_id, cb_data->hardcore, cb_data->is_leaderboard, 0, cb_data->timestamp);
-      rcheevos_register_achievement_unlocked(cb_data->username, cb_data->game_id, cb_data->hardcore, cb_data->achievement_id, 42 /* Achievements remaining: how to compute? */);
    }
    rcheevos_client_award_achievement_callback_data_free(cb_data);
    free(userdata);

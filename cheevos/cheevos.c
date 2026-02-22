@@ -89,12 +89,12 @@ static rcheevos_locals_t rcheevos_locals =
 #ifdef HAVE_THREADS
       CMD_EVENT_NONE, /* queued_command */
 #endif
-      true, /* local_only */
-      "",   /* displayname */
-      "",   /* username */
-      "",   /* token */
-      "",   /* user_agent_prefix */
-      "",   /* user_agent_core */
+      false, /* logged_in */
+      "",    /* displayname */
+      "",    /* username */
+      "",    /* token */
+      "",    /* user_agent_prefix */
+      "",    /* user_agent_core */
 #ifdef HAVE_MENU
       NULL, /* menuitems */
       0,    /* menuitem_capacity */
@@ -1914,8 +1914,7 @@ static void rcheevos_fetch_game_data(void)
 
    if (rcheevos_locals.load_info.state == RCHEEVOS_LOAD_STATE_NETWORK_ERROR)
    {
-      CHEEVOS_LOG(RCHEEVOS_TAG "No remove achievements available.\n");
-      rcheevos_locals.logged_in = true;
+      CHEEVOS_LOG(RCHEEVOS_TAG "No remote achievements available.\n");
    }
 
    if (!rcheevos_locals.token[0])

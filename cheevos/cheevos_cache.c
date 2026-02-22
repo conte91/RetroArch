@@ -625,3 +625,35 @@ bool rcheevos_cache_save_pending_unlocks(
 
    return result;
 }
+
+bool rcheevos_cache_remove_pending_unlock(
+   const char *username,
+   uint32_t id,
+   bool is_leaderboard)
+{
+   rcheevos_cache_pending_list_t pending;
+   uint32_t i;
+   bool found = false;
+
+   if (!rcheevos_cache_get_pending_unlocks(username, &pending))
+      return false;
+
+   for (i = 0; i < pending.num_entries; i++)
+   {
+      if (pending.entries[i].id == id &&
+          pending.entries[i].is_leaderboard == is_leaderboard)
+      {
+         /* Overwrite with last entry, then shrink */
+         pending.entries[i] = pending.entries[pending.num_entries - 1];
+         pending.num_entries--;
+         found = true;
+         break;
+      }
+   }
+
+   if (found)
+      rcheevos_cache_save_pending_unlocks(username, &pending);
+
+   rcheevos_cache_pending_free(&pending);
+   return found;
+}

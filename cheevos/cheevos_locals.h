@@ -154,6 +154,7 @@ typedef struct rcheevos_game_info_t
 
    unsigned achievement_count;
    unsigned leaderboard_count;
+   bool needs_sync; /* true when there are achievements queued for server sync */
 } rcheevos_game_info_t;
 
 #ifdef HAVE_MENU
