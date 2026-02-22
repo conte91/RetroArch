@@ -146,7 +146,7 @@ typedef struct rcheevos_fetch_badge_data
  * forward declarations     *
  ****************************/
 
-static retro_time_t rcheevos_client_prepare_ping(rcheevos_async_io_request *request);
+static retro_time_t rcheevos_client_prepare_ping(rcheevos_async_io_request *request, bool online);
 
 static void rcheevos_async_http_task_callback(retro_task_t *task, void *task_data, void *user_data,
                                               const char *error);
@@ -1754,7 +1754,7 @@ void rcheevos_client_initialize_runtime(unsigned game_id, rcheevos_client_callba
  * ping                     *
  ****************************/
 
-static retro_time_t rcheevos_client_prepare_ping(rcheevos_async_io_request *request)
+static retro_time_t rcheevos_client_prepare_ping(rcheevos_async_io_request *request, bool online)
 {
    rc_api_ping_request_t api_params;
    const rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
@@ -1786,6 +1786,10 @@ static retro_time_t rcheevos_client_prepare_ping(rcheevos_async_io_request *requ
    if (cheevos_richpresence_enable)
       return cpu_features_get_time_usec() + CHEEVOS_PING_FREQUENCY;
 
+   /* If network failed, ping more aggresively for it to come back */
+   if (online)
+      return cpu_features_get_time_usec() + CHEEVOS_PING_FREQUENCY / 2;
+
    /* Send ping every four minutes */
    return cpu_features_get_time_usec() + CHEEVOS_PING_FREQUENCY * 2;
 }
@@ -1797,6 +1801,7 @@ typedef struct
    rcheevos_async_io_request *net_poll_request; /* NULL when not online, non-null and has valid user agent when online. */
    rcheevos_async_io_request *ping_request;     /* Initialized once on successful login, NULL otherwise. */
    unsigned game_id;
+   char *username;
 
    /* TODO(future): these should be locked with a mutex */
    bool pending_sync_request;
@@ -1938,9 +1943,6 @@ static void rcheevos_client_award_pending_callback(void *userdata)
             cheevo->synced_active = cheevo->active;
       }
       get_rcheevos_locals()->pending_achievement_queue_size--;
-      /* Only re-read disk when the in-memory batch is exhausted */
-      if (get_rcheevos_locals()->pending_achievement_queue_size == 0)
-         rcheevos_sync_pending_state(cb_data->username);
       rcheevos_poll_dispatch_pending_achievements(cb_data->state);
    }
    else
@@ -2022,8 +2024,18 @@ static void rcheevos_client_dispatch_pending_entry(
 static void rcheevos_poll_dispatch_pending_achievements(rcheevos_async_network_state_poll_state_t *state)
 {
    rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
-   if (state->pending_sync_request || rcheevos_locals->pending_achievement_queue_size == 0)
+   if (state->pending_sync_request)
+   {
       return;
+   }
+   if (rcheevos_locals->pending_achievement_queue_size == 0)
+   {
+      rcheevos_sync_pending_state(state->username);
+   }
+   if (rcheevos_locals->pending_achievement_queue_size == 0)
+   {
+      return;
+   }
 
    /* Dispatch from the tail for O(1) removal via size decrement */
    rcheevos_client_dispatch_pending_entry(state, rcheevos_locals,
@@ -2097,7 +2109,7 @@ static void rcheevos_async_ping_handler(retro_task_t *task)
 
    /* update the request and set the task to fire again in
    * two minutes */
-   task->when = rcheevos_client_prepare_ping(request);
+   task->when = rcheevos_client_prepare_ping(request, state->online);
 
    /* start the HTTP request */
    rcheevos_async_begin_http_request(request);
@@ -2152,6 +2164,8 @@ void rcheevos_client_start_session(unsigned game_id)
    state->online = true;
    state->game_id = game_id;
    state->net_poll_request = NULL;
+   // TODO this needs proper free, do some rcheevos_async_network_state_poll_state_free() func and call it when both sub-tasks are done
+   state->username = strdup(rcheevos_locals->username);
    state->ping_request = NULL;
 
    rcheevos_client_start_network_state_poll(game_id, state);
