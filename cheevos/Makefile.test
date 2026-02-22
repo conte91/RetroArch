@@ -14,20 +14,31 @@ LIBRC_SRCS = \
 	$(LIBRC)/encodings/encoding_utf.c \
 	$(LIBRC)/encodings/encoding_crc32.c \
 	$(LIBRC)/file/file_path.c \
+	$(LIBRC)/file/file_path_io.c \
 	$(LIBRC)/time/rtime.c
 
-TEST_CFLAGS  = $(CFLAGS) -I$(LIBRC)/include $(shell pkg-config --cflags check) \
+TEST_CFLAGS  = $(CFLAGS) -I$(LIBRC)/include -I.. -pthread \
                -Werror -fsanitize=address -fsanitize=undefined \
                -ftest-coverage -fprofile-arcs -ggdb
-TEST_LDFLAGS = $(shell pkg-config --libs check)
+TEST_LDFLAGS = -lcheck
 
+# cheevos_cache_data: pure serialization, no RetroArch globals
 TEST_CACHE_DATA     = test/test_cheevos_cache_data
 TEST_CACHE_DATA_SRC = test_cheevos_cache_data.c cheevos_cache_data.c $(LIBRC_SRCS)
 
+# cheevos_cache: file I/O layer; stubs cheevos_locals.h via -include
+STUB_CHEEVOS_LOCALS = -include test/stubs/cheevos_locals.h
+TEST_CACHE     = test/test_cheevos_cache
+TEST_CACHE_SRC = test/test_cheevos_cache.c cheevos_cache.c cheevos_cache_data.c $(LIBRC_SRCS)
+
 all:
 	mkdir -p test
+	# cheevos_cache_data
 	$(CC) $(TEST_CFLAGS) $(TEST_CACHE_DATA_SRC) $(TEST_LDFLAGS) -o $(TEST_CACHE_DATA)
 	./$(TEST_CACHE_DATA)
+	# cheevos_cache
+	$(CC) $(TEST_CFLAGS) $(STUB_CHEEVOS_LOCALS) $(TEST_CACHE_SRC) $(TEST_LDFLAGS) -o $(TEST_CACHE)
+	./$(TEST_CACHE)
 
 coverage: all
 	lcov -c -d . -d $(LIBRC) -o test/coverage.info
