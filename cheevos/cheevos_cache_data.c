@@ -836,7 +836,9 @@ static bool pending_parse_start_object(void *ctx)
    pending_parse_ctx_t *pctx = (pending_parse_ctx_t *) ctx;
    pctx->depth++;
 
-   if (pctx->depth == 2)
+   /* Top-level container is an array (no array callbacks), so entry
+    * objects land at depth 1, not 2. */
+   if (pctx->depth == 1)
    {
       pctx->in_object = true;
       memset(&pctx->current, 0, sizeof(pctx->current));
@@ -849,7 +851,7 @@ static bool pending_parse_end_object(void *ctx)
 {
    pending_parse_ctx_t *pctx = (pending_parse_ctx_t *) ctx;
 
-   if (pctx->in_object && pctx->depth == 2)
+   if (pctx->in_object && pctx->depth == 1)
    {
       /* Add entry to list */
       rcheevos_cache_pending_t *new_arr = (rcheevos_cache_pending_t *) realloc(

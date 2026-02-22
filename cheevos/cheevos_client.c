@@ -1170,16 +1170,6 @@ static void rcheevos_client_cache_to_game_data(
 /* Backfills queued achievements, if any. Then completes runtime initialization. */
 static void rcheevos_client_finish_initialize_runtime(rcheevos_async_initialize_runtime_data_t *runtime_data)
 {
-   rcheevos_cache_pending_list_t pending;
-   if (rcheevos_cache_get_pending_unlocks(runtime_data->username, &pending))
-   {
-      for (int i = 0; i < pending.num_entries; ++i)
-      {
-         CHEEVOS_LOG(RCHEEVOS_TAG "Has pending achievement: %d.\n");
-      }
-   }
-
-
    if (runtime_data->callback)
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "Hell yeah, starting callback.\n");
@@ -1759,9 +1749,14 @@ typedef struct
 {
    rcheevos_async_network_state_poll_state_t *state; /* to reset pending_sync_request */
    char *username;
+   uint32_t game_id;
    uint32_t entry_id;
+   time_t timestamp;
+   bool hardcore;
    bool is_leaderboard;
    bool award_success;
+   unsigned int awarded_achievement_id;
+   int achievements_remaining;
 } rcheevos_pending_sync_cb_data_t;
 
 /* Forward declaration - rcheevos_client_award_pending_callback chains back into this */
@@ -1803,34 +1798,62 @@ static void rcheevos_sync_pending_state(
    rcheevos_cache_pending_free(&pending);
 }
 
+/** Shared HTTP response parser for both the normal and pending-sync award flows.
+ *  Returns true on success and fills the out-params. */
+static bool rcheevos_parse_award_achievement_response(
+   struct rcheevos_async_io_request *request,
+   http_transfer_data_t *data, char buffer[], size_t buffer_size,
+   unsigned int *awarded_id_out, int *achievements_remaining_out)
+{
+   rc_api_award_achievement_response_t api_response;
+   bool success = false;
+
+   int result = rc_api_process_award_achievement_response(&api_response, data->data);
+   if (rcheevos_async_succeeded(result, &api_response.response, buffer, buffer_size))
+   {
+      if (api_response.awarded_achievement_id != (unsigned) request->id)
+         snprintf(buffer, buffer_size, "Achievement %u awarded instead",
+                  api_response.awarded_achievement_id);
+      else if (api_response.response.error_message)
+         CHEEVOS_LOG(RCHEEVOS_TAG "Achievement %u: %s\n", request->id,
+                     api_response.response.error_message);
+
+      *awarded_id_out = api_response.awarded_achievement_id;
+      *achievements_remaining_out = api_response.achievements_remaining;
+      success = true;
+   }
+
+   rc_api_destroy_award_achievement_response(&api_response);
+   return success;
+}
+
 static void rcheevos_async_award_pending_callback(
    struct rcheevos_async_io_request *request,
    http_transfer_data_t *data, char buffer[],
    size_t buffer_size, void *handler_data)
 {
-   rc_api_award_achievement_response_t api_response;
    rcheevos_pending_sync_cb_data_t *cb_data =
       (rcheevos_pending_sync_cb_data_t *) handler_data;
-
-   int result = rc_api_process_award_achievement_response(&api_response, data->data);
-   if (rcheevos_async_succeeded(result, &api_response.response, buffer, buffer_size))
-      cb_data->award_success = true;
-
-   rc_api_destroy_award_achievement_response(&api_response);
+   cb_data->award_success = rcheevos_parse_award_achievement_response(
+      request, data, buffer, buffer_size,
+      &cb_data->awarded_achievement_id, &cb_data->achievements_remaining);
 }
 
-static void rcheevos_register_achievement_unlocked(const char *username, uint64_t game_id, bool hardcore, unsigned int awarded_achievement, unsigned int achievements_remaining)
+
+static void rcheevos_register_achievement_unlocked(const char *username, uint64_t game_id,
+                                                   bool hardcore, unsigned int awarded_achievement, unsigned int achievements_remaining,
+                                                   time_t unlock_time)
 {
-   /* Update cache if available */
    if (achievements_remaining == 0)
-   {
       rcheevos_show_mastery_placard();
-   }
+
    rcheevos_cache_user_unlocks_t cached_unlocks;
    if (rcheevos_cache_get_user_unlocks(username, game_id, hardcore, &cached_unlocks))
    {
-      // Update cache accordingly
-      cached_unlocks.unlocks = reallocarray(cached_unlocks.unlocks, cached_unlocks.num_unlocks + 1, sizeof(*cached_unlocks.unlocks));
+      cached_unlocks.unlocks = reallocarray(cached_unlocks.unlocks,
+                                            cached_unlocks.num_unlocks + 1, sizeof(*cached_unlocks.unlocks));
+      cached_unlocks.unlocks[cached_unlocks.num_unlocks].achievement_id = awarded_achievement;
+      cached_unlocks.unlocks[cached_unlocks.num_unlocks].unlock_time = unlock_time;
       cached_unlocks.num_unlocks++;
       rcheevos_cache_save_user_unlocks(username, game_id, hardcore, &cached_unlocks);
    }
@@ -1849,7 +1872,9 @@ static void rcheevos_client_award_pending_callback(void *userdata)
                   cb_data->is_leaderboard ? "leaderboard" : "achievement", cb_data->entry_id);
       rcheevos_cache_remove_pending_unlock(cb_data->username,
                                            cb_data->entry_id, cb_data->is_leaderboard);
-      rcheevos_register_achievement_unlocked();
+      rcheevos_register_achievement_unlocked(cb_data->username, cb_data->game_id,
+                                             cb_data->hardcore, cb_data->awarded_achievement_id, cb_data->achievements_remaining,
+                                             cb_data->timestamp);
       cb_data->state->pending_achievement_queue_size--;
       /* Only re-read disk when the in-memory batch is exhausted */
       if (cb_data->state->pending_achievement_queue_size == 0)
@@ -1899,7 +1924,10 @@ static void rcheevos_client_dispatch_pending_entry(
 
    cb_data->state = state;
    cb_data->username = strdup(rcheevos_locals->username);
+   cb_data->game_id = entry->game_id;
    cb_data->entry_id = entry->id;
+   cb_data->timestamp = entry->timestamp;
+   cb_data->hardcore = entry->hardcore;
    cb_data->is_leaderboard = false;
    cb_data->award_success = false;
 
@@ -2516,28 +2544,11 @@ static void rcheevos_async_award_achievement_callback(struct rcheevos_async_io_r
                                                       http_transfer_data_t *data, char buffer[],
                                                       size_t buffer_size, void *handler_data)
 {
-   rc_api_award_achievement_response_t api_response;
-   rcheevos_client_award_achievement_callback_data_t *cb_data = (rcheevos_client_award_achievement_callback_data_t *) handler_data;
-
-   int result = rc_api_process_award_achievement_response(&api_response, data->data);
-   if (rcheevos_async_succeeded(result, &api_response.response, buffer, buffer_size))
-   {
-      if (api_response.awarded_achievement_id != request->id)
-         snprintf(buffer, buffer_size, "Achievement %u awarded instead",
-                  api_response.awarded_achievement_id);
-      else if (api_response.response.error_message)
-      {
-         /* previously unlocked achievements are returned as a "successful" error
-       */
-         CHEEVOS_LOG(RCHEEVOS_TAG "Achievement %u: %s\n", request->id,
-                     api_response.response.error_message);
-      }
-      cb_data->award_success = true;
-      cb_data->awarded_achievement_id = api_response.awarded_achievement_id;
-      cb_data->awarded_achievement_remaining = api_response.achievements_remaining;
-   }
-
-   rc_api_destroy_award_achievement_response(&api_response);
+   rcheevos_client_award_achievement_callback_data_t *cb_data =
+      (rcheevos_client_award_achievement_callback_data_t *) handler_data;
+   cb_data->award_success = rcheevos_parse_award_achievement_response(
+      request, data, buffer, buffer_size,
+      &cb_data->awarded_achievement_id, &cb_data->awarded_achievement_remaining);
 }
 
 void rcheevos_client_award_achievement_callback(void *userdata)
@@ -2546,7 +2557,8 @@ void rcheevos_client_award_achievement_callback(void *userdata)
    if (cb_data->award_success)
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "Achievement %u successfully registered.\n", cb_data->achievement_id);
-      rcheevos_register_achievement_unlocked(cb_data->username, cb_data->game_id, cb_data->hardcore, cb_data->awarded_achievement_id, cb_data->awarded_achievement_remaining);
+      rcheevos_register_achievement_unlocked(cb_data->username, cb_data->game_id, cb_data->hardcore,
+                                             cb_data->awarded_achievement_id, cb_data->awarded_achievement_remaining, cb_data->timestamp);
    }
    else
    {
