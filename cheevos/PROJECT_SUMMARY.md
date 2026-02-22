@@ -180,6 +180,14 @@ fetch game data + fetch user unlocks (from server or local cache)
 
 ## What's Not Done Yet
 
+### Unit tests
+No tests exist for the cheevos cache layer. The repo uses **Check (libcheck)** as its test framework — see `libretro-common/test/` for examples (`test_stdstring.c`, `test_hash.c`, etc.). Pattern: standalone `.c` file, `START_TEST`/`END_TEST` macros, `ck_assert_*` assertions, compiled and run independently.
+
+Best starting point: `cheevos_cache_data.c` serialization functions — they are pure (no file I/O, no RetroArch globals) and straightforward to unit test. The file I/O layer in `cheevos_cache.c` depends on `config_get_ptr()` and the filesystem, so those need a temp-dir integration approach or mocking.
+
+Proposed test files:
+- `cheevos/test_cheevos_cache_data.c` — pending serialize/deserialize round-trips, field correctness, empty list, malformed JSON
+
 ### Leaderboard pending sync
 In `rcheevos_client_dispatch_pending_entry`, leaderboard entries are currently skipped with a log message. Need to implement similarly to achievement sync but using `rc_api_init_submit_lboard_entry_request` / `rc_api_process_submit_lboard_entry_response`.
 
