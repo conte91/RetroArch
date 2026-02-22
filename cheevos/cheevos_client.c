@@ -995,8 +995,10 @@ static rcheevos_racheevo_t *rcheevos_find_achievement_by_id(unsigned int id)
 
 /** Clears active bits for achievements that are in the pending queue so the
  *  rc_runtime won't re-trigger them.  synced_active is left intact so the
- *  menu can show them in the NEED_SYNC bucket. */
-static void rcheevos_client_apply_pending_unlocks(void)
+ *  menu can show them in the NEED_SYNC bucket.
+ *  game_id is the game the pending queue was loaded for; entries are skipped
+ *  if the session has moved to a different game in the meantime. */
+static void rcheevos_client_apply_pending_unlocks(uint32_t game_id)
 {
    int i;
    rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
@@ -1006,7 +1008,7 @@ static void rcheevos_client_apply_pending_unlocks(void)
       const rcheevos_cache_pending_t *entry = &rcheevos_locals->pending_achievement_queue[i];
       rcheevos_racheevo_t *cheevo;
 
-      if (entry->is_leaderboard || entry->game_id != (uint32_t) rcheevos_locals->game.id)
+      if (entry->is_leaderboard || game_id != (uint32_t) rcheevos_locals->game.id)
          continue;
 
       cheevo = rcheevos_find_achievement_by_id(entry->id);
@@ -1229,8 +1231,8 @@ static void rcheevos_client_cache_to_game_data(
 
 /* Backfills queued achievements, if any. Then completes runtime initialization. */
 /* Forward declarations for functions defined after the initialization callback */
-static void rcheevos_sync_pending_state(const char *username);
-static void rcheevos_client_apply_pending_unlocks(void);
+static void rcheevos_sync_pending_state(const char *username, uint32_t game_id);
+static void rcheevos_client_apply_pending_unlocks(uint32_t game_id);
 static rcheevos_racheevo_t *rcheevos_find_achievement_by_id(unsigned int id);
 
 static void rcheevos_client_finish_initialize_runtime(rcheevos_async_initialize_runtime_data_t *runtime_data)
@@ -1278,9 +1280,12 @@ static void rcheevos_client_initialize_runtime_callback(void *userdata)
    if (runtime_data->game_data_fetch_status == CHEEVOS_ASYNC_STATUS_SUCCESS && runtime_data->unlock_fetch_status[0] == CHEEVOS_ASYNC_STATUS_SUCCESS && runtime_data->unlock_fetch_status[1] == CHEEVOS_ASYNC_STATUS_SUCCESS && runtime_data->badge_fetch_done)
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "rcheevos_client_initialize_runtime_callback doing stuff!!\n");
-      rcheevos_sync_pending_state(get_rcheevos_locals()->username);
-      rcheevos_client_copy_achievements(runtime_data);
-      rcheevos_client_apply_pending_unlocks();
+      {
+         const uint32_t pending_game_id = get_rcheevos_locals()->game.id;
+         rcheevos_sync_pending_state(get_rcheevos_locals()->username, pending_game_id);
+         rcheevos_client_copy_achievements(runtime_data);
+         rcheevos_client_apply_pending_unlocks(pending_game_id);
+      }
       rcheevos_client_copy_leaderboards(runtime_data);
       rcheevos_client_initialize_runtime_rich_presence(runtime_data);
 #if 0
@@ -1839,7 +1844,7 @@ static void rcheevos_poll_dispatch_pending_achievements(rcheevos_async_network_s
 /** Reads pending.json into rcheevos_locals and updates game.needs_sync.
  *  Called once after unlock fetch completes (before copy_achievements) so the
  *  data is available for the pending backfill pass and for the network poll. */
-static void rcheevos_sync_pending_state(const char *username)
+static void rcheevos_sync_pending_state(const char *username, uint32_t game_id)
 {
    rcheevos_cache_pending_list_t pending;
    rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
@@ -1849,7 +1854,7 @@ static void rcheevos_sync_pending_state(const char *username)
    rcheevos_locals->pending_achievement_queue_size = 0;
    rcheevos_locals->game.needs_sync = false;
 
-   if (!rcheevos_cache_get_pending_unlocks(username, &pending))
+   if (!rcheevos_cache_get_pending_unlocks(username, game_id, &pending))
       return;
 
    if (pending.num_entries > 0)
@@ -1948,7 +1953,7 @@ static void rcheevos_client_award_pending_callback(void *userdata)
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "Pending %s %u synced to server.\n",
                   cb_data->is_leaderboard ? "leaderboard" : "achievement", cb_data->entry_id);
-      rcheevos_cache_remove_pending_unlock(cb_data->username,
+      rcheevos_cache_remove_pending_unlock(cb_data->username, cb_data->game_id,
                                            cb_data->entry_id, cb_data->is_leaderboard);
       rcheevos_register_achievement_unlocked(cb_data->username, cb_data->game_id,
                                              cb_data->hardcore, cb_data->awarded_achievement_id, cb_data->achievements_remaining,
@@ -2008,7 +2013,7 @@ static void rcheevos_client_dispatch_pending_entry(
 
    cb_data->state = state;
    cb_data->username = strdup(rcheevos_locals->username);
-   cb_data->game_id = entry->game_id;
+   cb_data->game_id = (uint32_t) rcheevos_locals->game.id;
    cb_data->entry_id = entry->id;
    cb_data->timestamp = entry->timestamp;
    cb_data->hardcore = entry->hardcore;
@@ -2051,7 +2056,7 @@ static void rcheevos_poll_dispatch_pending_achievements(rcheevos_async_network_s
    }
    if (rcheevos_locals->pending_achievement_queue_size == 0)
    {
-      rcheevos_sync_pending_state(state->username);
+      rcheevos_sync_pending_state(state->username, state->game_id);
    }
    if (rcheevos_locals->pending_achievement_queue_size == 0)
    {
@@ -2595,13 +2600,12 @@ void rcheevos_client_fetch_badges(rcheevos_client_callback callback, void *userd
 static void rcheevos_queue_achievement_sync(const char *username, uint64_t game_id, unsigned int achievement_id, bool hardcore, bool is_leaderboard, unsigned int score, time_t timestamp)
 {
    rcheevos_cache_pending_list_t pending;
-   if (!rcheevos_cache_get_pending_unlocks(username, &pending))
+   if (!rcheevos_cache_get_pending_unlocks(username, (uint32_t) game_id, &pending))
    {
       pending.entries = NULL;
       pending.num_entries = 0;
    }
    pending.entries = reallocarray(pending.entries, pending.num_entries + 1, sizeof(*pending.entries));
-   pending.entries[pending.num_entries].game_id = game_id;
    pending.entries[pending.num_entries].hardcore = hardcore;
    pending.entries[pending.num_entries].id = achievement_id;
    pending.entries[pending.num_entries].is_leaderboard = is_leaderboard;
@@ -2609,7 +2613,7 @@ static void rcheevos_queue_achievement_sync(const char *username, uint64_t game_
    pending.entries[pending.num_entries].score = score;
    pending.entries[pending.num_entries].timestamp = timestamp;
    pending.num_entries++;
-   if (rcheevos_cache_save_pending_unlocks(username, &pending))
+   if (rcheevos_cache_save_pending_unlocks(username, (uint32_t) game_id, &pending))
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "Achievement %d of game ID %d put in pending queue for `%s`.\n", achievement_id, game_id, username);
    }

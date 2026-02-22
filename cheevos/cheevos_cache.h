@@ -61,10 +61,10 @@ bool rcheevos_cache_save_hash_mapping(const char* hash, rcheevos_cache_hash_t* r
  * │       └── game.json            # Achievement + leaderboard definitions
  * └── users/
  *     └── <username>/
- *         ├── pending.json         # Queued unlocks for sync (all games)
  *         └── <game_id>/
  *             ├── unlocks_softcore.json
- *             └── unlocks_hardcore.json
+ *             ├── unlocks_hardcore.json
+ *             └── pending.json         # Queued unlocks for this game
  ************************************************************************/
 
 
@@ -134,26 +134,30 @@ bool rcheevos_cache_queue_leaderboard_submit(
    int32_t score,
    time_t timestamp);
 
-/* Get pending unlocks for a user
- * Caller must free the returned array
- * Returns count of pending items, or -1 on error */
+/* Get pending unlocks for a game
+ * Caller must free the returned list */
 bool rcheevos_cache_get_pending_unlocks(
    const char* username,
+   uint32_t game_id,
    rcheevos_cache_pending_list_t* out);
 
+/* Save pending unlocks for a game */
 bool rcheevos_cache_save_pending_unlocks(
    const char* username,
+   uint32_t game_id,
    const rcheevos_cache_pending_list_t* data);
 
 /* Remove a pending unlock after successful sync */
 bool rcheevos_cache_remove_pending_unlock(
    const char* username,
+   uint32_t game_id,
    uint32_t id,
    bool is_leaderboard);
 
 /* Update retry count for a pending unlock */
 bool rcheevos_cache_update_pending_retry(
    const char* username,
+   uint32_t game_id,
    uint32_t id,
    bool is_leaderboard,
    uint32_t retries);

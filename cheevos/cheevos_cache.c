@@ -142,12 +142,13 @@ static size_t rcheevos_cache_get_unlocks_path(const char *username, uint32_t gam
    return fill_pathname_join_special(buffer, user_game_dir, filename, buffer_size);
 }
 
-static size_t rcheevos_cache_get_pending_path(const char *username, char *buffer, size_t buffer_size)
+static size_t rcheevos_cache_get_pending_path(const char *username, uint32_t game_id,
+                                              char *buffer, size_t buffer_size)
 {
-   char user_dir[PATH_MAX_LENGTH];
-   if (rcheevos_cache_get_user_dir(username, user_dir, sizeof(user_dir)) == 0)
+   char user_game_dir[PATH_MAX_LENGTH];
+   if (rcheevos_cache_get_user_game_dir(username, game_id, user_game_dir, sizeof(user_game_dir)) == 0)
       return 0;
-   return fill_pathname_join_special(buffer, user_dir, "pending.json", buffer_size);
+   return fill_pathname_join_special(buffer, user_game_dir, "pending.json", buffer_size);
 }
 
 bool rcheevos_cache_save_hash_mapping(const char *restrict hash, rcheevos_cache_hash_t *data)
@@ -538,16 +539,16 @@ cleanup:
 
 bool rcheevos_cache_get_pending_unlocks(
    const char *username,
+   uint32_t game_id,
    rcheevos_cache_pending_list_t *out)
 {
    char path[PATH_MAX_LENGTH];
    char *content = NULL;
    int64_t bytes_read;
    bool result = false;
-   settings_t *settings = config_get_ptr();
 
    /* Get full file path */
-   if (rcheevos_cache_get_pending_path(username, path, sizeof(path)) == 0)
+   if (rcheevos_cache_get_pending_path(username, game_id, path, sizeof(path)) == 0)
       return false;
 
    /* Check if file exists */
@@ -563,9 +564,9 @@ bool rcheevos_cache_get_pending_unlocks(
    result = rcheevos_cache_pending_deserialize(content, out);
 
    if (result)
-      CHEEVOS_LOG(RCHEEVOS_TAG "Loaded %d pending unlocks for user (%s)\n", out->num_entries, username);
+      CHEEVOS_LOG(RCHEEVOS_TAG "Loaded %d pending unlocks for game %u (%s)\n", out->num_entries, game_id, username);
    else
-      CHEEVOS_LOG(RCHEEVOS_TAG "Failed to deserialize user unlocks for user %s\n", username);
+      CHEEVOS_LOG(RCHEEVOS_TAG "Failed to deserialize pending unlocks for game %u\n", game_id);
 
 cleanup:
    if (content)
@@ -576,10 +577,14 @@ cleanup:
 
 bool rcheevos_cache_save_pending_unlocks(
    const char *username,
+   uint32_t game_id,
    const rcheevos_cache_pending_list_t *data)
 {
    char path[PATH_MAX_LENGTH];
    char user_dir[PATH_MAX_LENGTH];
+   char user_game_dir[PATH_MAX_LENGTH];
+   char cache_dir[PATH_MAX_LENGTH];
+   char user_base[PATH_MAX_LENGTH];
    char *json = NULL;
    bool result = false;
    settings_t *settings = config_get_ptr();
@@ -590,25 +595,34 @@ bool rcheevos_cache_save_pending_unlocks(
    if (string_is_empty(dir_thumbnails))
       return false;
 
-   /* Get full file path */
+   if (rcheevos_cache_get_directory(cache_dir, sizeof(cache_dir)) == 0)
+      return false;
+
+   if (fill_pathname_join_special(user_base, cache_dir, RCHEEVOS_CACHE_USER_DIR, sizeof(user_base)) == 0)
+      return false;
+
    if (rcheevos_cache_get_user_dir(username, user_dir, sizeof(user_dir)) == 0)
       return false;
 
-   /* Get full file path */
-   if (rcheevos_cache_get_pending_path(username, path, sizeof(path)) == 0)
+   if (rcheevos_cache_get_user_game_dir(username, game_id, user_game_dir, sizeof(user_game_dir)) == 0)
       return false;
 
-   /* Ensure user base directory exists */
-   if (!rcheevos_cache_ensure_directory(user_dir, dir_thumbnails))
+   if (rcheevos_cache_get_pending_path(username, game_id, path, sizeof(path)) == 0)
+      return false;
+
+   /* Ensure directory chain exists */
+   if (!rcheevos_cache_ensure_directory(user_base, dir_thumbnails) ||
+       !rcheevos_cache_ensure_directory(user_dir, dir_thumbnails) ||
+       !rcheevos_cache_ensure_directory(user_game_dir, dir_thumbnails))
    {
-      CHEEVOS_LOG(RCHEEVOS_TAG "Failed to create pending achievements directory: %s\n", user_dir);
+      CHEEVOS_LOG(RCHEEVOS_TAG "Failed to create directory for pending.json (game %u)\n", game_id);
       return false;
    }
 
-   /* Serialize the unlocks data to JSON */
+   /* Serialize the pending list to JSON */
    if (!rcheevos_cache_pending_serialize(data, &json))
    {
-      CHEEVOS_LOG(RCHEEVOS_TAG "Failed to serialize pending unlocks into `%s`\n", path);
+      CHEEVOS_LOG(RCHEEVOS_TAG "Failed to serialize pending unlocks for game %u\n", game_id);
       return false;
    }
 
@@ -616,9 +630,9 @@ bool rcheevos_cache_save_pending_unlocks(
    result = filestream_write_file(path, json, strlen(json));
 
    if (result)
-      CHEEVOS_LOG(RCHEEVOS_TAG "Saved %d pending unlocks for user %u.\n", data->num_entries);
+      CHEEVOS_LOG(RCHEEVOS_TAG "Saved %d pending unlocks for game %u (%s)\n", data->num_entries, game_id, username);
    else
-      CHEEVOS_LOG(RCHEEVOS_TAG "Failed to write pending user unlocks file: %s\n", path);
+      CHEEVOS_LOG(RCHEEVOS_TAG "Failed to write pending unlocks file: %s\n", path);
 
    if (json)
       free(json);
@@ -628,6 +642,7 @@ bool rcheevos_cache_save_pending_unlocks(
 
 bool rcheevos_cache_remove_pending_unlock(
    const char *username,
+   uint32_t game_id,
    uint32_t id,
    bool is_leaderboard)
 {
@@ -635,7 +650,7 @@ bool rcheevos_cache_remove_pending_unlock(
    uint32_t i;
    bool found = false;
 
-   if (!rcheevos_cache_get_pending_unlocks(username, &pending))
+   if (!rcheevos_cache_get_pending_unlocks(username, game_id, &pending))
       return false;
 
    for (i = 0; i < pending.num_entries; i++)
@@ -652,7 +667,7 @@ bool rcheevos_cache_remove_pending_unlock(
    }
 
    if (found)
-      rcheevos_cache_save_pending_unlocks(username, &pending);
+      rcheevos_cache_save_pending_unlocks(username, game_id, &pending);
 
    rcheevos_cache_pending_free(&pending);
    return found;

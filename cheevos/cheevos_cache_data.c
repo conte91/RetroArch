@@ -729,10 +729,6 @@ bool rcheevos_cache_pending_serialize(const rcheevos_cache_pending_list_t *data,
       rjsonwriter_raw(writer, "  {\n", 4);
 
       rjsonwriter_raw(writer, "    ", 4);
-      CHEEVOS_JSON_KEY(writer, "game_id");
-      rjsonwriter_rawf(writer, "%u,\n", entry->game_id);
-
-      rjsonwriter_raw(writer, "    ", 4);
       CHEEVOS_JSON_KEY(writer, "id");
       rjsonwriter_rawf(writer, "%u,\n", entry->id);
 
@@ -794,9 +790,7 @@ static bool pending_parse_number(void *ctx, const char *str, size_t len)
    if (!pctx->in_object || !pctx->current_key)
       return true;
 
-   if (string_is_equal(pctx->current_key, "game_id"))
-      pctx->current.game_id = (uint32_t) strtoul(str, NULL, 10);
-   else if (string_is_equal(pctx->current_key, "id"))
+   if (string_is_equal(pctx->current_key, "id"))
       pctx->current.id = (uint32_t) strtoul(str, NULL, 10);
    else if (string_is_equal(pctx->current_key, "timestamp"))
       pctx->current.timestamp = (time_t) strtoll(str, NULL, 10);

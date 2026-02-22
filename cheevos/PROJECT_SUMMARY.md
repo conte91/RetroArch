@@ -37,9 +37,9 @@ All cache files live under RetroArch's thumbnail dir, e.g.:
 ~/.config/retroarch/thumbnails/cheevos/cache/
   hash/<md5>.json                         — hash → game_id mapping
   game/<game_id>.json                     — game data (achievements, leaderboards)
-  user/<username>/unlocks/<game_id>.json      — server-confirmed softcore unlocks
-  user/<username>/unlocks/<game_id>_hc.json  — server-confirmed hardcore unlocks
-  user/<username>/pending.json            — locally unlocked, not yet synced to server
+  user/<username>/<game_id>/unlocks_softcore.json — server-confirmed softcore unlocks
+  user/<username>/<game_id>/unlocks_hardcore.json — server-confirmed hardcore unlocks
+  user/<username>/<game_id>/pending.json          — locally unlocked, not yet synced to server
 ```
 
 **Unlock cache** and **pending queue** are mutually exclusive:
@@ -74,7 +74,6 @@ rcheevos_game_info_t game;
 
 ### `rcheevos_cache_pending_t` (cheevos_cache_data.h)
 ```c
-uint32_t game_id;
 uint32_t id;          // achievement or leaderboard ID
 time_t   timestamp;   // when unlock occurred
 uint32_t retries;     // retry count (not yet enforced)
@@ -138,7 +137,7 @@ rcheevos_client_start_session()
                               rcheevos_register_achievement_unlocked()  → unlock cache
                               rcheevos_find_achievement_by_id() → synced_active = active
                               locals->pending_achievement_queue_size--
-                              if size == 0: rcheevos_sync_pending_state()  → re-read disk
+                              if size == 0: rcheevos_sync_pending_state(username, game_id)  → re-read disk
                               rcheevos_poll_dispatch_pending_achievements()  → chain next
                           → if failure: log, retry next poll cycle
 ```
@@ -147,10 +146,10 @@ rcheevos_client_start_session()
 ```
 fetch game data + fetch user unlocks (from server or local cache)
   → rcheevos_client_initialize_runtime_callback()
-      → rcheevos_sync_pending_state(username)       ← single disk read of pending.json
-      → rcheevos_client_copy_achievements()          ← sets active + synced_active from server data
-      → rcheevos_client_apply_pending_unlocks()      ← clears active bits for pending entries
-                                                        (prevents rc_runtime from retriggering)
+      → rcheevos_sync_pending_state(username, game_id)   ← reads per-game pending.json
+      → rcheevos_client_copy_achievements()               ← sets active + synced_active from server data
+      → rcheevos_client_apply_pending_unlocks(game_id)    ← clears active bits for pending entries
+                                                              (skips if game changed mid-load)
       → rcheevos_client_copy_leaderboards()
   → rcheevos_client_start_session()
       → rcheevos_client_start_network_state_poll()  ← pending queue already in locals, no re-read
@@ -166,8 +165,8 @@ fetch game data + fetch user unlocks (from server or local cache)
 | `rcheevos_client_award_achievement()` | `cheevos_client.c` | Builds and fires HTTP award request |
 | `rcheevos_parse_award_achievement_response()` | `cheevos_client.c` | Shared HTTP response parser for both normal and pending flows |
 | `rcheevos_queue_achievement_sync()` | `cheevos_client.c` | Appends entry to pending.json |
-| `rcheevos_sync_pending_state()` | `cheevos_client.c` | Reads pending.json into `locals->pending_achievement_queue`, sets `needs_sync` |
-| `rcheevos_client_apply_pending_unlocks()` | `cheevos_client.c` | Clears `active` bits for pending entries after game load |
+| `rcheevos_sync_pending_state(username, game_id)` | `cheevos_client.c` | Reads per-game pending.json into `locals->pending_achievement_queue`, sets `needs_sync` |
+| `rcheevos_client_apply_pending_unlocks(game_id)` | `cheevos_client.c` | Clears `active` bits for pending entries; skips if active game changed mid-load |
 | `rcheevos_find_achievement_by_id()` | `cheevos_client.c` | Linear scan of `game.achievements` by id |
 | `rcheevos_register_achievement_unlocked()` | `cheevos_client.c` | Writes confirmed unlock to unlock cache, shows mastery placard if complete |
 | `rcheevos_poll_dispatch_pending_achievements()` | `cheevos_client.c` | Called each poll tick; dispatches one pending entry if no request in flight |
@@ -186,9 +185,6 @@ In `rcheevos_client_dispatch_pending_entry`, leaderboard entries are currently s
 
 ### Retry cap
 `rcheevos_cache_pending_t.retries` field exists but is never incremented or checked. No max retry limit is enforced — a permanently-invalid entry would be retried forever.
-
-### Stale declaration
-`rcheevos_cache_process_pending_queue()` is declared in `cheevos_cache.h` but never implemented (superseded by the poll-based approach). Safe to remove.
 
 ### Unlock cache not populated during offline session
 When an achievement is queued offline, nothing is written to the unlock cache — only to pending.json. The unlock cache is written when pending sync succeeds. This is correct behavior: `apply_pending_unlocks` uses the pending queue to suppress rc_runtime retriggers, so the unlock cache absence doesn't cause duplicates. But it means the unlock cache may be stale until next successful sync.

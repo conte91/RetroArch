@@ -101,7 +101,6 @@ typedef struct rcheevos_cache_user_unlocks_t
 
 typedef struct rcheevos_cache_pending_t
 {
-   uint32_t game_id;         /* Game ID */
    uint32_t id;              /* Achievement or leaderboard ID */
    time_t timestamp;         /* When the unlock/submission occurred */
    uint32_t retries;         /* Number of retry attempts */
