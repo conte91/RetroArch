@@ -481,6 +481,7 @@ static bool game_parse_end_array(void *ctx)
    game_parse_ctx_t *pctx = (game_parse_ctx_t *) ctx;
    pctx->in_achievements = false;
    pctx->in_leaderboards = false;
+   pctx->depth--;
    return true;
 }
 

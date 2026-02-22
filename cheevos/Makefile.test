@@ -1,0 +1,37 @@
+# Run from RetroArch root: make -C cheevos -f Makefile.test
+
+LIBRC = ../libretro-common
+
+LIBRC_SRCS = \
+	$(LIBRC)/formats/json/rjson.c \
+	$(LIBRC)/string/stdstring.c \
+	$(LIBRC)/compat/compat_strl.c \
+	$(LIBRC)/compat/compat_posix_string.c \
+	$(LIBRC)/streams/file_stream.c \
+	$(LIBRC)/streams/interface_stream.c \
+	$(LIBRC)/streams/memory_stream.c \
+	$(LIBRC)/vfs/vfs_implementation.c \
+	$(LIBRC)/encodings/encoding_utf.c \
+	$(LIBRC)/encodings/encoding_crc32.c \
+	$(LIBRC)/file/file_path.c \
+	$(LIBRC)/time/rtime.c
+
+TEST_CFLAGS  = $(CFLAGS) -I$(LIBRC)/include $(shell pkg-config --cflags check) \
+               -Werror -fsanitize=address -fsanitize=undefined \
+               -ftest-coverage -fprofile-arcs -ggdb
+TEST_LDFLAGS = $(shell pkg-config --libs check)
+
+TEST_CACHE_DATA     = test/test_cheevos_cache_data
+TEST_CACHE_DATA_SRC = test_cheevos_cache_data.c cheevos_cache_data.c $(LIBRC_SRCS)
+
+all:
+	mkdir -p test
+	$(CC) $(TEST_CFLAGS) $(TEST_CACHE_DATA_SRC) $(TEST_LDFLAGS) -o $(TEST_CACHE_DATA)
+	./$(TEST_CACHE_DATA)
+
+coverage: all
+	lcov -c -d . -d $(LIBRC) -o test/coverage.info
+	genhtml -o test/coverage/ test/coverage.info
+
+clean:
+	rm -rf test/ *.gcda *.gcno $(LIBRC)/**/*.gcda $(LIBRC)/**/*.gcno
