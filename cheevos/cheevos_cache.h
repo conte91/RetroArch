@@ -158,11 +158,6 @@ bool rcheevos_cache_update_pending_retry(
    bool is_leaderboard,
    uint32_t retries);
 
-/* Process all pending unlocks - attempt to sync them to server
- * Called on startup and when network becomes available
- * Returns count of successfully synced items */
-int rcheevos_cache_process_pending_queue(const char* username);
-
 /************************************************************************
  * Cache Path Utilities                                                 *
  ************************************************************************/

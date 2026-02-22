@@ -822,6 +822,8 @@ static void rcheevos_client_identify_game_remote(const char *hash,
    }
 }
 
+/** Try to resolve hash→game_id from the local disk cache.
+ *  Fires callback immediately on hit and returns true; returns false on miss. */
 static bool rcheevos_client_identify_game_cached(const char *hash,
                                                  rcheevos_client_callback callback, void *userdata)
 {
@@ -978,6 +980,7 @@ rcheevos_client_copy_achievements(rcheevos_async_initialize_runtime_data_t *runt
    CHEEVOS_LOG(RCHEEVOS_TAG "Total achievements: %d\n", rcheevos_locals->game.achievement_count);
 }
 
+/** Linear scan of game.achievements; returns a pointer to the matching entry or NULL. */
 static rcheevos_racheevo_t *rcheevos_find_achievement_by_id(unsigned int id)
 {
    unsigned i;
@@ -1080,6 +1083,7 @@ static void rcheevos_client_initialize_runtime_rich_presence(
    }
 }
 
+/** Convert a live rc_api game-data response into the flat cache struct. */
 static void rcheevos_client_game_data_to_cache(
    const rc_api_fetch_game_data_response_t *runtime_data,
    rcheevos_cache_game_t *cached_game_data)
@@ -1129,6 +1133,7 @@ static void rcheevos_client_game_data_to_cache(
    cached_game_data->num_leaderboards = runtime_data->num_leaderboards;
 }
 
+/** Convert a live rc_api user-unlocks response into the flat cache struct. */
 static void rcheevos_client_unlocks_to_cache(
    const rc_api_fetch_user_unlocks_response_t *runtime_data,
    const char *username,
@@ -1153,6 +1158,7 @@ static void rcheevos_client_unlocks_to_cache(
    cached_unlocks->last_updated = current_time;
 }
 
+/** Convert cached unlock data back to an rc_api user-unlocks response struct. */
 static void rcheevos_client_cache_to_unlocks(
    const rcheevos_cache_user_unlocks_t *cached_unlocks,
    rc_api_fetch_user_unlocks_response_t *runtime_data)
@@ -1172,6 +1178,7 @@ static void rcheevos_client_cache_to_unlocks(
    runtime_data->num_achievement_ids = cached_unlocks->num_unlocks;
 }
 
+/** Convert cached game data back to an rc_api game-data response struct. */
 static void rcheevos_client_cache_to_game_data(
    const rcheevos_cache_game_t *cached_game_data,
    rc_api_fetch_game_data_response_t *runtime_data)
@@ -1516,6 +1523,7 @@ static void rcheevos_async_fetch_game_data_callback(struct rcheevos_async_io_req
    }
 }
 
+/** Load game data from disk cache into runtime_data; returns false on cache miss. */
 static bool rcheevos_client_get_cached_game_data(uint64_t game_id, rcheevos_async_initialize_runtime_data_t *data)
 {
    rcheevos_cache_game_t game_data;
@@ -1535,6 +1543,7 @@ static bool rcheevos_client_get_cached_game_data(uint64_t game_id, rcheevos_asyn
    return true;
 }
 
+/** Serve game data from the disk cache if still valid; fire a remote fetch otherwise. */
 static void rcheevos_client_start_fetch_game_data(rcheevos_async_initialize_runtime_data_t *data)
 {
    const rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
@@ -1611,6 +1620,7 @@ static void rcheevos_client_start_fetch_game_data(rcheevos_async_initialize_runt
 #endif
 }
 
+/** Load user unlock data from disk cache into runtime_data; returns false on cache miss. */
 static bool rcheevos_client_get_cached_unlocks_data(int hardcore, uint32_t game_id, rcheevos_async_initialize_runtime_data_t *data)
 {
    rcheevos_cache_user_unlocks_t cached_unlocks;
@@ -1638,6 +1648,7 @@ static bool rcheevos_client_get_cached_unlocks_data(int hardcore, uint32_t game_
    return true;
 }
 
+/** Serve user unlock data from the disk cache if still valid; fire a remote fetch otherwise. */
 static void rcheevos_client_start_fetch_user_unlocks(int hardcore, rcheevos_async_initialize_runtime_data_t *data)
 {
    const rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
@@ -1889,6 +1900,7 @@ static bool rcheevos_parse_award_achievement_response(
    return success;
 }
 
+/** HTTP handler for a pending-award request; parses the response and stores the result in cb_data. */
 static void rcheevos_async_award_pending_callback(
    struct rcheevos_async_io_request *request,
    http_transfer_data_t *data, char buffer[],
@@ -1902,6 +1914,7 @@ static void rcheevos_async_award_pending_callback(
 }
 
 
+/** Append a confirmed unlock to the unlock cache and show the mastery placard if all done. */
 static void rcheevos_register_achievement_unlocked(const char *username, uint64_t game_id,
                                                    bool hardcore, unsigned int awarded_achievement, unsigned int achievements_remaining,
                                                    time_t unlock_time)
@@ -1921,6 +1934,9 @@ static void rcheevos_register_achievement_unlocked(const char *username, uint64_
    }
 }
 
+/** Task callback after a pending-award HTTP request completes.
+ *  On success: removes the entry from disk, updates the unlock cache, clears synced_active,
+ *  and chains the next pending dispatch.  On failure: logs and leaves the entry for next poll. */
 static void rcheevos_client_award_pending_callback(void *userdata)
 {
    rcheevos_pending_sync_cb_data_t *cb_data =
@@ -1943,7 +1959,10 @@ static void rcheevos_client_award_pending_callback(void *userdata)
             cheevo->synced_active = cheevo->active;
       }
       get_rcheevos_locals()->pending_achievement_queue_size--;
-      rcheevos_poll_dispatch_pending_achievements(cb_data->state);
+      if (cb_data->state->online)
+      {
+         rcheevos_poll_dispatch_pending_achievements(cb_data->state);
+      }
    }
    else
    {
@@ -1956,6 +1975,7 @@ static void rcheevos_client_award_pending_callback(void *userdata)
    free(cb_data);
 }
 
+/** Build and fire the HTTP award request for a single pending queue entry. */
 static void rcheevos_client_dispatch_pending_entry(
    rcheevos_async_network_state_poll_state_t *state,
    const rcheevos_locals_t *rcheevos_locals,
@@ -2021,6 +2041,7 @@ static void rcheevos_client_dispatch_pending_entry(
    }
 }
 
+/** Called each poll tick; dispatches the tail entry of the pending queue if no request is in-flight. */
 static void rcheevos_poll_dispatch_pending_achievements(rcheevos_async_network_state_poll_state_t *state)
 {
    rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
@@ -2042,6 +2063,8 @@ static void rcheevos_poll_dispatch_pending_achievements(rcheevos_async_network_s
                                           &rcheevos_locals->pending_achievement_queue[rcheevos_locals->pending_achievement_queue_size - 1]);
 }
 
+/** Recurring task handler fired every 60s; dispatches pending achievements when online,
+ *  and stops itself when the loaded game changes. */
 static void rcheevos_async_network_state_poll_handler(retro_task_t *task)
 {
    rcheevos_async_network_state_poll_state_t *state = (rcheevos_async_network_state_poll_state_t *) task->user_data;
@@ -2130,6 +2153,7 @@ static void rcheevos_async_start_session_callback(struct rcheevos_async_io_reque
    rc_api_destroy_start_session_response(&api_response);
 }
 
+/** Schedule the recurring network-state poll task; fires immediately on the next task_queue_check. */
 static void rcheevos_client_start_network_state_poll(unsigned game_id, rcheevos_async_network_state_poll_state_t *state)
 {
    rcheevos_locals_t *rcheevos_locals = get_rcheevos_locals();
@@ -2567,6 +2591,7 @@ void rcheevos_client_fetch_badges(rcheevos_client_callback callback, void *userd
  * award achievement        *
  ****************************/
 
+/** Append a failed award to pending.json so it can be retried when connectivity returns. */
 static void rcheevos_queue_achievement_sync(const char *username, uint64_t game_id, unsigned int achievement_id, bool hardcore, bool is_leaderboard, unsigned int score, time_t timestamp)
 {
    rcheevos_cache_pending_list_t pending;
