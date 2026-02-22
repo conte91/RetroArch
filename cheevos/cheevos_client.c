@@ -89,8 +89,7 @@ enum rcheevos_async_io_type
    CHEEVOS_ASYNC_FETCH_USER_UNLOCKS,
    CHEEVOS_ASYNC_FETCH_HARDCORE_USER_UNLOCKS,
    CHEEVOS_ASYNC_START_SESSION,
-   CHEEVOS_ASYNC_FETCH_BADGE,
-   CHEEVOS_ASYNC_NETWORK_POLL,
+   CHEEVOS_ASYNC_FETCH_BADGE
 };
 
 struct rcheevos_async_io_request;
@@ -386,13 +385,25 @@ static bool rcheevos_async_request_failed(rcheevos_async_io_request *request, co
          case CHEEVOS_ASYNC_FETCH_BADGE:
             return false;
 
+         /*
+          Initialization stage.
+          Make a maximum of four attempts
+          (0ms -> 250ms -> 500ms -> 1s)
+         */
          case CHEEVOS_ASYNC_RESOLVE_HASH:
+         case CHEEVOS_ASYNC_FETCH_GAME_DATA:
+         case CHEEVOS_ASYNC_FETCH_USER_UNLOCKS:
+         case CHEEVOS_ASYNC_FETCH_HARDCORE_USER_UNLOCKS:
          case CHEEVOS_ASYNC_LOGIN:
-            /* make a maximum of four attempts
-         (0ms -> 250ms -> 500ms -> 1s) */
             if (request->attempt_count == 3)
                return false;
             break;
+         case CHEEVOS_ASYNC_AWARD_ACHIEVEMENT:
+            /* make a maximum of seven attempts (0ms -> ... -> 8s, aka 15s total wait) */
+            if (request->attempt_count == 6)
+               return false;
+            break;
+
 
          default:
             break;
@@ -2052,15 +2063,15 @@ static void rcheevos_async_ping_callback(struct rcheevos_async_io_request *reque
                                          void *handler_data)
 {
    rcheevos_async_network_state_poll_state_t *state = (rcheevos_async_network_state_poll_state_t *) handler_data;
-   if (data->status != 200)
+   if (data->status == 200)
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "Ping succeeded for game %u :)\n", request->id);
       state->online = true;
       return;
    }
 
-   // Network temporarily down. Will retry.
-   CHEEVOS_LOG(RCHEEVOS_TAG "Ping failed for game %u :( code: %d\n", data->status);
+   /* Network temporarily down. Will retry. */
+   CHEEVOS_LOG(RCHEEVOS_TAG "Ping failed for game %u :( code: %d\n", request->id, data->status);
    state->online = false;
 }
 

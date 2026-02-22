@@ -1950,17 +1950,7 @@ static void rcheevos_fetch_game_data(void)
 #endif
 
    rcheevos_client_initialize_runtime(rcheevos_locals.game.id, rcheevos_initialize_runtime_callback, NULL);
-
-   int i = rcheevos_end_load_state();
-   if (i == 0)
-   {
-      CHEEVOS_LOG(RCHEEVOS_TAG "WOAH THIS LOAD STATE??\n");
-      rcheevos_start_session();
-   }
-   else
-   {
-      CHEEVOS_LOG(RCHEEVOS_TAG "NO SUCH  LOAD STATE?? %d left\n", i);
-   }
+   rcheevos_end_load_state();
 }
 
 struct rcheevos_identify_game_data
