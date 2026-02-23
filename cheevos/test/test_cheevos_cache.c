@@ -101,7 +101,7 @@ START_TEST(test_pending_save_and_load_one_entry)
    ck_assert_int_eq(dst.entries[0].hardcore, true);
    ck_assert_int_eq(dst.entries[0].is_leaderboard, false);
 
-   rcheevos_cache_pending_free(&dst);
+   rcheevos_cache_pending_list_free(&dst);
 }
 END_TEST
 
@@ -134,7 +134,7 @@ START_TEST(test_pending_save_and_load_two_entries)
    }
    ck_assert_uint_eq(ids, 3);
 
-   rcheevos_cache_pending_free(&dst);
+   rcheevos_cache_pending_list_free(&dst);
 }
 END_TEST
 
@@ -157,7 +157,7 @@ START_TEST(test_pending_remove_after_sync)
    memset(&dst, 0, sizeof(dst));
    rcheevos_cache_get_pending_unlocks("player1", 777, &dst);
    ck_assert_uint_eq(dst.num_entries, 0);
-   rcheevos_cache_pending_free(&dst);
+   rcheevos_cache_pending_list_free(&dst);
 }
 END_TEST
 
@@ -188,7 +188,7 @@ START_TEST(test_pending_remove_one_of_two)
       if (dst.entries[i].id == 22222) found_22222 = true;
    ck_assert(found_22222);
 
-   rcheevos_cache_pending_free(&dst);
+   rcheevos_cache_pending_list_free(&dst);
 }
 END_TEST
 
@@ -221,8 +221,8 @@ START_TEST(test_pending_queues_are_per_game)
    ck_assert_uint_eq(dst_a.entries[0].id, 1001);
    ck_assert_uint_eq(dst_b.entries[0].id, 2001);
 
-   rcheevos_cache_pending_free(&dst_a);
-   rcheevos_cache_pending_free(&dst_b);
+   rcheevos_cache_pending_list_free(&dst_a);
+   rcheevos_cache_pending_list_free(&dst_b);
 }
 END_TEST
 
@@ -257,7 +257,7 @@ START_TEST(test_pending_leaderboard_score_survives_disk)
    }
    ck_assert(found);
 
-   rcheevos_cache_pending_free(&dst);
+   rcheevos_cache_pending_list_free(&dst);
 }
 END_TEST
 

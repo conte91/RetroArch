@@ -569,6 +569,11 @@ static void rcheevos_async_begin_request(rcheevos_async_io_request *request, int
                                          rcheevos_async_handler handler, void *handler_data, char type, int id,
                                          const char *success_message, const char *failure_message)
 {
+   /* Set type before the error check: rcheevos_async_end_request uses it to decide
+    * whether to free the request.  Without this, a calloc'd request has type 0
+    * (== CHEEVOS_ASYNC_RICHPRESENCE) and the init-failure path leaks the request. */
+   request->type = type;
+
    if (init_result != RC_OK)
    {
       char errbuf[256];
@@ -588,7 +593,6 @@ static void rcheevos_async_begin_request(rcheevos_async_io_request *request, int
 
    request->handler = handler;
    request->handler_data = handler_data;
-   request->type = type;
    request->id = id;
    request->success_message = success_message;
    request->failure_message = failure_message;
@@ -1412,6 +1416,10 @@ static void rcheevos_client_fetch_game_badge(const char *badge_name,
       }
    }
 #endif
+#if !defined(HAVE_GFX_WIDGETS)
+   (void) badge_name;
+   runtime_data->badge_fetch_done = true;
+#endif
 }
 
 static void rcheevos_async_fetch_user_unlocks_callback(struct rcheevos_async_io_request *request,
@@ -1477,6 +1485,8 @@ static void rcheevos_fetch_game_data_done(rcheevos_async_initialize_runtime_data
    }
    else
    {
+      /* No badge fetch will occur on game-data failure. */
+      runtime_data->badge_fetch_done = true;
       rcheevos_unload();
    }
 }
@@ -1873,7 +1883,7 @@ static void rcheevos_sync_pending_state(const char *username, uint32_t game_id)
       }
    }
 
-   rcheevos_cache_pending_free(&pending);
+   rcheevos_cache_pending_list_free(&pending);
 }
 
 /** Shared HTTP response parser for both the normal and pending-sync award flows.
@@ -1936,6 +1946,7 @@ static void rcheevos_register_achievement_unlocked(const char *username, uint64_
       cached_unlocks.unlocks[cached_unlocks.num_unlocks].unlock_time = unlock_time;
       cached_unlocks.num_unlocks++;
       rcheevos_cache_save_user_unlocks(username, game_id, hardcore, &cached_unlocks);
+      rcheevos_cache_unlocks_free(&cached_unlocks);
    }
 }
 
@@ -2617,7 +2628,7 @@ static void rcheevos_queue_achievement_sync(const char *username, uint64_t game_
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "Achievement %d of game ID %d put in pending queue for `%s`.\n", achievement_id, game_id, username);
    }
-   rcheevos_cache_pending_free(&pending);
+   rcheevos_cache_pending_list_free(&pending);
 }
 
 
@@ -2636,7 +2647,7 @@ typedef struct rcheevos_async_award_achievement_callback_data_t
    int awarded_achievement_remaining; // Only valid if `award_success`
 } rcheevos_client_award_achievement_callback_data_t;
 
-void rcheevos_client_award_achievement_callback_data_free(rcheevos_client_award_achievement_callback_data_t *data)
+static void rcheevos_client_award_achievement_callback_data_free(rcheevos_client_award_achievement_callback_data_t *data)
 {
    if (!data)
    {
@@ -2656,7 +2667,7 @@ static void rcheevos_async_award_achievement_callback(struct rcheevos_async_io_r
       &cb_data->awarded_achievement_id, &cb_data->awarded_achievement_remaining);
 }
 
-void rcheevos_client_award_achievement_callback(void *userdata)
+static void rcheevos_client_award_achievement_callback(void *userdata)
 {
    rcheevos_client_award_achievement_callback_data_t *cb_data = (rcheevos_client_award_achievement_callback_data_t *) userdata;
    if (cb_data->award_success)

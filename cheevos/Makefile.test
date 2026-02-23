@@ -31,6 +31,17 @@ STUB_CHEEVOS_LOCALS = -include test/stubs/cheevos_locals.h
 TEST_CACHE     = test/test_cheevos_cache
 TEST_CACHE_SRC = test/test_cheevos_cache.c cheevos_cache.c cheevos_cache_data.c $(LIBRC_SRCS)
 
+# cheevos_client: public cheevos_client API contract tests; rc_* and RetroArch
+# dependencies are stubbed in the test file/stub header.
+STUB_CHEEVOS_CLIENT  = -include test/stubs/cheevos_client_stubs.h
+# Only rcheevos headers are needed for types; all rc_* functions are stubbed in the test file.
+TEST_CLIENT_IFLAGS   = -I../deps/rcheevos/include \
+                       -I../deps/rcheevos/src/rcheevos
+TEST_CLIENT_CFLAGS   = $(TEST_CFLAGS) $(TEST_CLIENT_IFLAGS) $(STUB_CHEEVOS_CLIENT)
+TEST_CLIENT          = test/test_cheevos_client
+TEST_CLIENT_SRC      = test/test_cheevos_client.c cheevos_client.c cheevos_cache.c cheevos_cache_data.c \
+                       $(LIBRC_SRCS)
+
 all:
 	mkdir -p test
 	# cheevos_cache_data
@@ -39,10 +50,17 @@ all:
 	# cheevos_cache
 	$(CC) $(TEST_CFLAGS) $(STUB_CHEEVOS_LOCALS) $(TEST_CACHE_SRC) $(TEST_LDFLAGS) -o $(TEST_CACHE)
 	./$(TEST_CACHE)
+	# cheevos_client
+	$(CC) $(TEST_CLIENT_CFLAGS) $(TEST_CLIENT_SRC) $(TEST_LDFLAGS) -o $(TEST_CLIENT)
+	./$(TEST_CLIENT)
 
 coverage: all
 	lcov -c -d . -d $(LIBRC) -o test/coverage.info
 	genhtml -o test/coverage/ test/coverage.info
 
 clean:
-	rm -rf test/ *.gcda *.gcno $(LIBRC)/**/*.gcda $(LIBRC)/**/*.gcno
+	rm -f $(TEST_CACHE_DATA) $(TEST_CACHE) $(TEST_CLIENT)
+	rm -f test/*.gcda test/*.gcno
+	rm -rf test/coverage test/coverage.info
+	rm -f *.gcda *.gcno
+	rm -f $(LIBRC)/**/*.gcda $(LIBRC)/**/*.gcno
