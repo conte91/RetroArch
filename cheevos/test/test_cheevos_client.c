@@ -28,6 +28,11 @@ static runloop_state_t s_runloop;
 static bool s_mastery_placard_shown;
 static retro_task_t *s_task_queue[32];
 static unsigned s_task_queue_count;
+static struct
+{
+   unsigned count;
+   char messages[32][256];
+} s_notifications;
 
 typedef struct
 {
@@ -362,7 +367,24 @@ runloop_state_t *runloop_state_get_ptr(void) { return &s_runloop; }
 void runloop_msg_queue_push(const char *msg, unsigned prio, unsigned duration,
                             bool flush, char *title, enum message_queue_icon icon,
                             enum message_queue_category category)
-{ (void)msg; (void)prio; (void)duration; (void)flush; (void)title; (void)icon; (void)category; }
+{
+   (void)prio;
+   (void)duration;
+   (void)flush;
+   (void)title;
+   (void)icon;
+   (void)category;
+
+   if (!msg)
+      return;
+
+   if (s_notifications.count < 32)
+   {
+      strlcpy(s_notifications.messages[s_notifications.count], msg,
+              sizeof(s_notifications.messages[s_notifications.count]));
+      s_notifications.count++;
+   }
+}
 
 /* load-state stubs */
 void rcheevos_begin_load_state(enum rcheevos_load_state state) { (void)state; }
@@ -620,6 +642,7 @@ static void fixture_setup(void)
    memset(&s_locals, 0, sizeof(s_locals));
    memset(&s_runloop, 0, sizeof(s_runloop));
    memset(s_task_queue, 0, sizeof(s_task_queue));
+   memset(&s_notifications, 0, sizeof(s_notifications));
    s_task_queue_count = 0;
    mock_reset_defaults();
    s_mastery_placard_shown = false;
@@ -627,6 +650,7 @@ static void fixture_setup(void)
    strlcpy(s_tmpdir, dir, sizeof(s_tmpdir));
    strlcpy(s_settings.paths.directory_thumbnails, dir, sizeof(s_settings.paths.directory_thumbnails));
    s_settings.bools.cheevos_cache_enabled = true;
+   s_settings.bools.cheevos_visibility_unlock = true;
 
    strlcpy(s_locals.username, "player1", sizeof(s_locals.username));
    s_locals.game.id = 777;
@@ -760,6 +784,22 @@ static bool unlock_cache_contains_achievement(const char *username, uint32_t gam
    return found;
 }
 
+static bool notification_contains(const char *needle)
+{
+   unsigned i;
+
+   if (!needle)
+      return false;
+
+   for (i = 0; i < s_notifications.count; i++)
+   {
+      if (strstr(s_notifications.messages[i], needle))
+         return true;
+   }
+
+   return false;
+}
+
 /* ---- Tests ---- */
 START_TEST(test_contract_login_success_dispatches_request_and_fires_callback)
 {
@@ -831,6 +871,7 @@ START_TEST(test_contract_award_achievement_success_updates_unlock_cache)
       if (result.unlocks[i].achievement_id == 31337) found = true;
    ck_assert(found);
    rcheevos_cache_unlocks_free(&result);
+   ck_assert(!notification_contains("saved locally"));
 }
 END_TEST
 
@@ -855,6 +896,8 @@ START_TEST(test_contract_award_achievement_failure_queues_pending)
    ck_assert_uint_eq(pending.entries[0].id, 404);
    ck_assert_int_eq(pending.entries[0].hardcore, true);
    rcheevos_cache_pending_list_free(&pending);
+   ck_assert(notification_contains("saved locally"));
+   ck_assert(notification_contains("1 pending sync"));
 }
 END_TEST
 
@@ -1002,6 +1045,10 @@ START_TEST(test_contract_pending_awards_sync_after_ping_recovers)
    ck_assert(unlock_cache_contains_achievement("player1", 777, false, 1001));
    ck_assert(unlock_cache_contains_achievement("player1", 777, false, 1002));
    ck_assert_uint_ge(s_http_mock.http.by_url_ping, 2);
+   ck_assert(notification_contains("saved locally"));
+   ck_assert(notification_contains("2 pending sync"));
+   ck_assert(notification_contains("All achievements synchronized :)"));
+   ck_assert(!notification_contains("Error syncing pending achievement"));
 
    /* Stop recurring session tasks so LSAN can observe clean shutdown in test process. */
    s_locals.game.id = 0;

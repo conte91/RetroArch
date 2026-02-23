@@ -178,15 +178,34 @@ fetch game data + fetch user unlocks (from server or local cache)
 
 ---
 
-## What's Not Done Yet
+## Test Coverage
 
-### Unit tests
-No tests exist for the cheevos cache layer. The repo uses **Check (libcheck)** as its test framework — see `libretro-common/test/` for examples (`test_stdstring.c`, `test_hash.c`, etc.). Pattern: standalone `.c` file, `START_TEST`/`END_TEST` macros, `ck_assert_*` assertions, compiled and run independently.
+**Run all tests**: `make -C cheevos -f Makefile.test`
 
-Best starting point: `cheevos_cache_data.c` serialization functions — they are pure (no file I/O, no RetroArch globals) and straightforward to unit test. The file I/O layer in `cheevos_cache.c` depends on `config_get_ptr()` and the filesystem, so those need a temp-dir integration approach or mocking.
+Notes:
+- In a normal local shell, this runs with ASAN/UBSan/LSAN enabled by `Makefile.test`
+- In some wrapped/ptrace environments, LSAN aborts early (`LeakSanitizer does not work under ptrace`)
+- For those environments only, use `ASAN_OPTIONS=detect_leaks=0 LSAN_OPTIONS=detect_leaks=0`
 
-Proposed test files:
-- `cheevos/test_cheevos_cache_data.c` — pending serialize/deserialize round-trips, field correctness, empty list, malformed JSON
+### Test files
+| File | Tests | What's covered |
+|------|-------|----------------|
+| `test_cheevos_cache_data.c` | 15 | Serialization round-trips: pending, unlocks, hash, game data |
+| `test/test_cheevos_cache.c` | 8 | File I/O layer: pending queue + unlock cache operations |
+| `test/test_cheevos_client.c` | 9 | **Contract tests** for client flows: login success/failure, identify, award success/failure queueing, initialize_runtime trajectories (online/login-fail/offline-cache), pending sync after ping recovery |
+
+### Test infrastructure
+- `test/test_cheevos_client.c` no longer includes `cheevos_client.c` directly; it includes `cheevos_client.h` and links `cheevos_client.c` normally via `Makefile.test`
+- `test/stubs/cheevos_client_stubs.h` force-includes lightweight replacements for heavy RetroArch headers
+- `cheevos_client` tests use a configurable mock `rc_api` + mock HTTP transport (request capture + scripted responses)
+- A small fake task queue harness drives recurring ping/network-poll handlers deterministically (no sleeps)
+- Deferred mock HTTP callback mode is used for `initialize_runtime` trajectory tests to better match real async ordering
+- `Makefile.test clean` was fixed to avoid deleting `cheevos/test/` sources/stubs (it now removes generated artifacts only)
+
+### Known testing debt / next session
+- `test/test_cheevos_client.c` is now contract-focused, but still uses a Check fixture (`tcase_add_checked_fixture`). If desired, convert to explicit `test_env_init/destroy` in each test for less "magic".
+- No tests yet validate user-facing notification UX for offline queue/sync states (e.g. queued-for-sync, all-synchronized). This likely needs capturing `runloop_msg_queue_push(...)`.
+- Full LSAN validation should be run in a normal local shell (not ptrace-wrapped runners).
 
 ### Leaderboard pending sync
 In `rcheevos_client_dispatch_pending_entry`, leaderboard entries are currently skipped with a log message. Need to implement similarly to achievement sync but using `rc_api_init_submit_lboard_entry_request` / `rc_api_process_submit_lboard_entry_response`.

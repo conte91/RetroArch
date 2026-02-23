@@ -113,9 +113,8 @@ static rcheevos_locals_t rcheevos_locals =
       false, /* leaderboards_enabled */
       false, /* leaderboard_notifications */
       false, /* leaderboard_trackers */
-      false, /* cache_initialized */
-      false, /* loaded_from_cache */
-      0      /* cache_game_id */
+      NULL,  /* pending_achievement_queue */
+      0      /* pending_achievement_queue_size */
 };
 
 rcheevos_locals_t *get_rcheevos_locals(void)
@@ -1668,6 +1667,7 @@ static void rcheevos_show_game_placard(void)
    int number_of_active = 0;
    int number_of_unsupported = 0;
    int number_of_core = 0;
+   int number_pending_sync = 0;
    int mode = RCHEEVOS_ACTIVE_SOFTCORE;
 
    if (rcheevos_locals.game.id < 0) /* make sure there's actually a game loaded */
@@ -1682,6 +1682,8 @@ static void rcheevos_show_game_placard(void)
          continue;
 
       number_of_core++;
+      if (cheevo->active != cheevo->synced_active)
+         number_pending_sync++;
       if (cheevo->active & RCHEEVOS_ACTIVE_UNSUPPORTED)
          number_of_unsupported++;
       else if (cheevo->active & mode)
@@ -1713,6 +1715,23 @@ static void rcheevos_show_game_placard(void)
                   "You have %d of %d achievements unlocked (%d unsupported).",
                   number_of_core - number_of_active - number_of_unsupported,
                   number_of_core, number_of_unsupported);
+   }
+
+   if (number_of_core > 0)
+   {
+      size_t len = strlen(msg);
+      if (number_pending_sync > 0)
+      {
+         snprintf(msg + len, sizeof(msg) - len,
+                  (number_pending_sync == 1)
+                     ? " (1 pending sync)."
+                     : " (%d pending sync).",
+                  number_pending_sync);
+      }
+      else if (rcheevos_locals.logged_in)
+      {
+         snprintf(msg + len, sizeof(msg) - len, " (all synchronized).");
+      }
    }
 
    msg[sizeof(msg) - 1] = 0;
