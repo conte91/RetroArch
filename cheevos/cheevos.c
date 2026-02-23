@@ -1113,7 +1113,6 @@ void rcheevos_hardcore_enabled_changed(void)
 
 void rcheevos_validate_config_settings(void)
 {
-   CHEEVOS_LOG(RCHEEVOS_TAG "Validate settings starts :)\n");
    int i;
    const rc_disallowed_setting_t
       *disallowed_settings = NULL;
@@ -1141,13 +1140,11 @@ void rcheevos_validate_config_settings(void)
 
    if (!(disallowed_settings = rc_libretro_get_disallowed_settings(system->library_name)))
    {
-      CHEEVOS_LOG(RCHEEVOS_TAG "Disallowed setting :O\n");
       return;
    }
 
    if (!retroarch_ctl(RARCH_CTL_CORE_OPTIONS_LIST_GET, &coreopts))
    {
-      CHEEVOS_LOG(RCHEEVOS_TAG "RARCH CTL :O\n");
       return;
    }
 
@@ -1183,10 +1180,8 @@ void rcheevos_validate_config_settings(void)
 
       runloop_msg_queue_push(buffer, 0, 4 * 60, false, NULL,
                              MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_WARNING);
-      CHEEVOS_LOG(RCHEEVOS_TAG "In console ID return\n");
       return;
    }
-   CHEEVOS_LOG(RCHEEVOS_TAG "Validate settings finished :)\n");
 }
 
 static void rcheevos_runtime_event_handler(
@@ -1798,7 +1793,6 @@ static void rcheevos_fetch_badges(void)
 
 static void rcheevos_start_session_async(retro_task_t *task)
 {
-   CHEEVOS_LOG(RCHEEVOS_TAG "rcheevos_start_session_async\n");
    const bool needs_runtime =
       (rcheevos_locals.game.achievement_count > 0 || rcheevos_locals.game.leaderboard_count > 0 || rcheevos_locals.runtime.richpresence);
 
@@ -1866,16 +1860,11 @@ static void rcheevos_start_session_async(retro_task_t *task)
    task_set_finished(task, true);
 
    if (rcheevos_end_load_state() == 0)
-   {
-      CHEEVOS_LOG(RCHEEVOS_TAG "I am fetching badges :)\n");
       rcheevos_fetch_badges();
-   }
-   CHEEVOS_LOG(RCHEEVOS_TAG "End rcheevos_start_session_async\n");
 }
 
 static void rcheevos_start_session_finish(retro_task_t *task, void *data, void *userdata, const char *error)
 {
-   CHEEVOS_LOG(RCHEEVOS_TAG "rcheevos_start_session_finish\n");
    (void) task;
    (void) data;
    (void) userdata;
@@ -1907,9 +1896,7 @@ static void rcheevos_start_session(void)
 
 static void rcheevos_initialize_runtime_callback(void *userdata)
 {
-   CHEEVOS_LOG(RCHEEVOS_TAG "rcheevos_initialize_runtime_callback()\n");
    rcheevos_start_session();
-   CHEEVOS_LOG(RCHEEVOS_TAG "end rcheevos_initialize_runtime_callback()\n");
 }
 
 static void rcheevos_fetch_game_data(void)
@@ -2033,12 +2020,7 @@ static void rcheevos_identify_game_callback(void *userdata)
    /* hash resolution complete, proceed to fetching game data */
    if (rcheevos_end_load_state() == 0)
    {
-      CHEEVOS_LOG(RCHEEVOS_TAG "FETCHING\n");
       rcheevos_fetch_game_data();
-   }
-   else
-   {
-      CHEEVOS_LOG(RCHEEVOS_TAG "NOT FETCHING\n");
    }
 }
 
@@ -2134,7 +2116,6 @@ static bool rcheevos_identify_game(const struct retro_game_info *info)
 
 static void rcheevos_login_callback(void *userdata)
 {
-   CHEEVOS_LOG(RCHEEVOS_TAG "LOGIN CALLBACK\n");
    if (rcheevos_locals.token[0])
    {
       const settings_t *settings = config_get_ptr();
@@ -2152,12 +2133,7 @@ static void rcheevos_login_callback(void *userdata)
    }
    if (rcheevos_end_load_state() == 0)
    {
-      CHEEVOS_LOG(RCHEEVOS_TAG "FETCHING\n");
       rcheevos_fetch_game_data();
-   }
-   else
-   {
-      CHEEVOS_LOG(RCHEEVOS_TAG "NOT FETCHING\n");
    }
 }
 
@@ -2190,7 +2166,6 @@ int rcheevos_end_load_state(void)
    slock_unlock(rcheevos_locals.load_info.request_lock);
 #endif
 
-   CHEEVOS_LOG(RCHEEVOS_TAG "Outstanding %d requests\n", requests);
    return requests;
 }
 
@@ -2211,7 +2186,6 @@ bool rcheevos_load_aborted(void)
 
 bool rcheevos_load(const void *data)
 {
-   CHEEVOS_LOG(RCHEEVOS_TAG "CHEEVOS LOAD\n");
    const struct retro_game_info *info = (const struct retro_game_info *)
       data;
    settings_t *settings = config_get_ptr();
@@ -2238,7 +2212,6 @@ bool rcheevos_load(const void *data)
       return false;
    }
 
-   CHEEVOS_LOG(RCHEEVOS_TAG "Check login\n");
    if (string_is_empty(settings->arrays.cheevos_username))
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "Cannot login (no username)\n");
@@ -2340,12 +2313,7 @@ bool rcheevos_load(const void *data)
 
    if (rcheevos_end_load_state() == 0)
    {
-      CHEEVOS_LOG(RCHEEVOS_TAG "FETCHING\n");
       rcheevos_fetch_game_data();
-   }
-   else
-   {
-      CHEEVOS_LOG(RCHEEVOS_TAG "NOT FETCHING\n");
    }
 
    return true;

@@ -405,4 +405,3 @@ Log only:
 ## Closing Assessment
 
 The underlying feature set (offline pending queue + background sync) is now stronger than the current UX communicates. A small set of targeted text-message updates would make the system feel coherent and trustworthy on Miyoo354, especially under unreliable connectivity.
-

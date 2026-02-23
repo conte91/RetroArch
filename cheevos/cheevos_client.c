@@ -36,8 +36,6 @@
 #include "../network/net_http_special.h"
 #include "../tasks/tasks_internal.h"
 
-#include "../configuration.h"
-
 #ifdef HAVE_PRESENCE
 #include "../network/presence.h"
 #endif
@@ -709,7 +707,7 @@ static void rcheevos_client_login_callback(void *userdata)
    }
    else
    {
-      CHEEVOS_LOG(RCHEEVOS_TAG "Successful login for  `%s` :)\n", data->username);
+      CHEEVOS_LOG(RCHEEVOS_TAG "Successful login for `%s`\n", data->username);
       rcheevos_locals->logged_in = true;
    }
    if (data->callback)
@@ -1248,7 +1246,7 @@ static void rcheevos_client_finish_initialize_runtime(rcheevos_async_initialize_
 {
    if (runtime_data->callback)
    {
-      CHEEVOS_LOG(RCHEEVOS_TAG "Hell yeah, starting callback.\n");
+      CHEEVOS_LOG(RCHEEVOS_TAG "Starting callback.\n");
       runtime_data->callback(runtime_data->callback_data);
    }
 
@@ -1316,7 +1314,7 @@ static void rcheevos_client_initialize_runtime_callback(void *userdata)
    }
    else
    {
-      CHEEVOS_LOG(RCHEEVOS_TAG "rcheevos_client_initialize_runtime_callback exiting because stuff isn't there; sad.\n");
+      CHEEVOS_LOG(RCHEEVOS_TAG "rcheevos_client_initialize_runtime_callback exiting because required data is missing.\n");
    }
 
    rc_api_destroy_fetch_user_unlocks_response(&runtime_data->hardcore_unlocks);
@@ -1327,7 +1325,6 @@ static void rcheevos_client_initialize_runtime_callback(void *userdata)
 
 static void rcheevos_client_fetch_game_badge_callback(void *userdata)
 {
-   CHEEVOS_LOG("FETCH GAME BADGE CALLBACK!\n");
    rcheevos_fetch_badge_data *data = (rcheevos_fetch_badge_data *) userdata;
    rcheevos_async_initialize_runtime_data_t *runtime_data =
       (rcheevos_async_initialize_runtime_data_t *) data->state->callback_data;
@@ -1336,7 +1333,6 @@ static void rcheevos_client_fetch_game_badge_callback(void *userdata)
    free(data->state);
    free(data);
 
-   CHEEVOS_LOG("Now calling init cb \n");
    runtime_data->badge_fetch_done = true;
    rcheevos_client_initialize_runtime_callback(runtime_data);
 }
@@ -2189,7 +2185,7 @@ static void rcheevos_async_ping_callback(struct rcheevos_async_io_request *reque
    rcheevos_async_network_state_poll_state_t *state = (rcheevos_async_network_state_poll_state_t *) handler_data;
    if (data->status == 200)
    {
-      CHEEVOS_LOG(RCHEEVOS_TAG "Ping succeeded for game %u :)\n", request->id);
+      CHEEVOS_LOG(RCHEEVOS_TAG "Ping succeeded for game %u\n", request->id);
       state->online = true;
       return;
    }
