@@ -713,6 +713,8 @@ static void rcheevos_client_login_callback(void *userdata)
    {
       data->callback(data->cb_data);
    }
+   free(data->username);
+   data->username = NULL;
    free(userdata);
 }
 

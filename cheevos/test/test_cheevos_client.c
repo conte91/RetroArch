@@ -469,16 +469,54 @@ int rc_api_process_fetch_game_data_response(rc_api_fetch_game_data_response_t *r
    r->response.error_message = s_http_mock.fetch_game_data_response.error_message;
    r->id = s_http_mock.fetch_game_data_response.id;
    r->console_id = s_http_mock.fetch_game_data_response.console_id;
-   r->title = s_http_mock.fetch_game_data_response.title ? s_http_mock.fetch_game_data_response.title : "";
-   r->image_name = s_http_mock.fetch_game_data_response.image_name ? s_http_mock.fetch_game_data_response.image_name : "";
-   r->rich_presence_script = s_http_mock.fetch_game_data_response.rich_presence_script ? s_http_mock.fetch_game_data_response.rich_presence_script : "";
+   r->title = s_http_mock.fetch_game_data_response.title;
+   r->image_name = s_http_mock.fetch_game_data_response.image_name;
+   r->rich_presence_script = s_http_mock.fetch_game_data_response.rich_presence_script;
    r->achievements = s_http_mock.fetch_game_data_response.achievements;
    r->num_achievements = s_http_mock.fetch_game_data_response.num_achievements;
    r->leaderboards = s_http_mock.fetch_game_data_response.leaderboards;
    r->num_leaderboards = s_http_mock.fetch_game_data_response.num_leaderboards;
    return s_http_mock.fetch_game_data.process_result;
 }
-void rc_api_destroy_fetch_game_data_response(rc_api_fetch_game_data_response_t *r) { (void)r; }
+void rc_api_destroy_fetch_game_data_response(rc_api_fetch_game_data_response_t *r)
+{
+   unsigned i;
+   if (!r)
+      return;
+
+   if (r->achievements && r->achievements != s_http_mock.fetch_game_data_response.achievements)
+   {
+      for (i = 0; i < r->num_achievements; i++)
+      {
+         free((void*)r->achievements[i].author);
+         free((void*)r->achievements[i].badge_name);
+         free((void*)r->achievements[i].definition);
+         free((void*)r->achievements[i].description);
+         free((void*)r->achievements[i].title);
+      }
+      free(r->achievements);
+   }
+
+   if (r->leaderboards && r->leaderboards != s_http_mock.fetch_game_data_response.leaderboards)
+   {
+      for (i = 0; i < r->num_leaderboards; i++)
+      {
+         free((void*)r->leaderboards[i].definition);
+         free((void*)r->leaderboards[i].description);
+         free((void*)r->leaderboards[i].title);
+      }
+      free(r->leaderboards);
+   }
+
+   if (r->title && r->title != s_http_mock.fetch_game_data_response.title)
+      free((void*)r->title);
+   if (r->image_name && r->image_name != s_http_mock.fetch_game_data_response.image_name)
+      free((void*)r->image_name);
+   if (r->rich_presence_script && r->rich_presence_script != s_http_mock.fetch_game_data_response.rich_presence_script)
+      free((void*)r->rich_presence_script);
+
+   memset(r, 0, sizeof(*r));
+}
 
 int rc_api_init_fetch_user_unlocks_request(rc_api_request_t *r, const rc_api_fetch_user_unlocks_request_t *p)
 {
@@ -505,7 +543,19 @@ int rc_api_process_fetch_user_unlocks_response(rc_api_fetch_user_unlocks_respons
    r->num_achievement_ids = s_http_mock.fetch_unlocks_response[hardcore].num_ids;
    return s_http_mock.fetch_user_unlocks[hardcore].process_result;
 }
-void rc_api_destroy_fetch_user_unlocks_response(rc_api_fetch_user_unlocks_response_t *r) { (void)r; }
+void rc_api_destroy_fetch_user_unlocks_response(rc_api_fetch_user_unlocks_response_t *r)
+{
+   if (!r)
+      return;
+
+   if (r->achievement_ids &&
+       r->achievement_ids != s_http_mock.fetch_unlocks_response[0].ids &&
+       r->achievement_ids != s_http_mock.fetch_unlocks_response[1].ids)
+      free(r->achievement_ids);
+
+   r->achievement_ids = NULL;
+   r->num_achievement_ids = 0;
+}
 
 int rc_api_init_award_achievement_request(rc_api_request_t *r, const rc_api_award_achievement_request_t *p)
 {
