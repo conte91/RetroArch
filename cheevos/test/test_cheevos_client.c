@@ -952,6 +952,12 @@ START_TEST(test_contract_pending_awards_sync_after_ping_recovers)
    ck_assert(unlock_cache_contains_achievement("player1", 777, false, 1001));
    ck_assert(unlock_cache_contains_achievement("player1", 777, false, 1002));
    ck_assert_uint_ge(s_http_mock.http.by_url_ping, 2);
+
+   /* Stop recurring session tasks so LSAN can observe clean shutdown in test process. */
+   s_locals.game.id = 0;
+   run_task_handlers_once();
+   run_task_handlers_once();
+   compact_finished_tasks();
 }
 END_TEST
 

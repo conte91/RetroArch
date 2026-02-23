@@ -1828,10 +1828,33 @@ typedef struct
    rcheevos_async_io_request *ping_request;     /* Initialized once on successful login, NULL otherwise. */
    unsigned game_id;
    char *username;
+   unsigned task_refs;                          /* shared by net poll + ping recurring tasks */
 
    /* TODO(future): these should be locked with a mutex */
    bool pending_sync_request;
 } rcheevos_async_network_state_poll_state_t;
+
+static void rcheevos_async_network_state_poll_state_release(
+      rcheevos_async_network_state_poll_state_t *state)
+{
+   if (!state)
+      return;
+
+   if (state->task_refs > 1)
+   {
+      state->task_refs--;
+      return;
+   }
+
+   state->task_refs = 0;
+   free(state->net_poll_request);
+   state->net_poll_request = NULL;
+   free(state->ping_request);
+   state->ping_request = NULL;
+   free(state->username);
+   state->username = NULL;
+   free(state);
+}
 
 /** Callback data for a single pending achievement/leaderboard sync attempt */
 typedef struct
@@ -2089,7 +2112,7 @@ static void rcheevos_async_network_state_poll_handler(retro_task_t *task)
    if (state->game_id != rcheevos_locals->game.id)
    {
       CHEEVOS_LOG(RCHEEVOS_TAG "Stopping periodic rich presence update task for game %u\n",
-                  state->net_poll_request->id);
+                  state->game_id);
       /* game changed; stop the recurring task - a new one will
      * be scheduled if a new game is loaded */
       task_set_finished(task, 1);
@@ -2097,6 +2120,7 @@ static void rcheevos_async_network_state_poll_handler(retro_task_t *task)
      * in rcheevos_async_http_task_callback */
       free(state->net_poll_request);
       state->net_poll_request = NULL;
+      rcheevos_async_network_state_poll_state_release(state);
       return;
    }
    if (state->online)
@@ -2143,6 +2167,8 @@ static void rcheevos_async_ping_handler(retro_task_t *task)
       /* request->request was destroyed
      * in rcheevos_async_http_task_callback */
       free(request);
+      state->ping_request = NULL;
+      rcheevos_async_network_state_poll_state_release(state);
       return;
    }
 
@@ -2204,9 +2230,9 @@ void rcheevos_client_start_session(unsigned game_id)
    state->online = true;
    state->game_id = game_id;
    state->net_poll_request = NULL;
-   // TODO this needs proper free, do some rcheevos_async_network_state_poll_state_free() func and call it when both sub-tasks are done
    state->username = strdup(rcheevos_locals->username);
    state->ping_request = NULL;
+   state->task_refs = 1; /* network poll task */
 
    rcheevos_client_start_network_state_poll(game_id, state);
 
@@ -2234,6 +2260,7 @@ void rcheevos_client_start_session(unsigned game_id)
 
          state->ping_request->handler = rcheevos_async_ping_callback;
          state->ping_request->handler_data = state;
+         state->task_refs++;
          task->handler = rcheevos_async_ping_handler;
          task->user_data = state;
          task->progress = -1;
