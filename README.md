@@ -208,6 +208,30 @@ To configure joypads, use the built-in menu or manually configure them in `retro
 
 Instructions for compiling and installing RetroArch can be found in the [Libretro/RetroArch Documentation Center](https://docs.libretro.com/).
 
+## Building for Miyoo Mini (OnionOS)
+
+This fork targets the **Miyoo Mini / Miyoo Mini+** running OnionOS. Two build modes are supported.
+
+### Cross-compile (target device)
+
+Requires the [Miyoo Mini toolchain](https://github.com/MiyooMini/union-toolchain) installed at `/opt/miyoomini-toolchain` (override with `TOOLCHAIN_DIR=...`).
+
+```sh
+make MIYOO354=1
+```
+
+Add `DEBUG=1` for a debug build (no stripping, extra symbols).
+
+### Native build (development / testing on x86-64 Linux)
+
+Builds a native x86-64 binary with the Miyoo feature set enabled (`DINGUX`, SDL2 video/input). Useful for iterating quickly without the cross-compiler. Requires `libsdl2-dev` and `libfreetype6-dev`.
+
+```sh
+make NATIVE=1 MIYOO354=1
+```
+
+The resulting binary behaves like the cross-compiled one in terms of enabled features (`DINGUX`, networking, RetroAchievements, etc.) but runs on your host machine.
+
 ## CRT 15Khz Resolution Switching
 
 CRT SwitchRes will turn on, on the fly. However, you will need to restart RetroArch to disable it. With CRT SwitchRes enable RetroArch will start in 2560 x 480 @ 60.

@@ -42,6 +42,7 @@
 #include "../../configuration.h"
 #include "../../retroarch.h"
 #include "../../verbosity.h"
+#include "../../input/input_driver.h"
 
 static void sdl2_gfx_free(void *data);
 
@@ -435,8 +436,44 @@ static void *sdl2_gfx_init(const video_info_t *video,
 
    sdl_refresh_viewport(vid);
 
-   *input      = NULL;
+   /* Initialize input driver */
+   *input = NULL;
    *input_data = NULL;
+
+#if defined(HAVE_SDL2)
+   {
+      settings_t *settings = config_get_ptr();
+      const char *input_drv_name = settings->arrays.input_driver;
+      const char *joypad_drv_name = settings->arrays.input_joypad_driver;
+
+      if (!string_is_empty(input_drv_name))
+      {
+         if (string_is_equal(input_drv_name, "sdl2") || string_is_equal(input_drv_name, "sdl"))
+         {
+            *input_data = input_driver_init_wrap(&input_sdl, joypad_drv_name);
+            if (*input_data)
+               *input = &input_sdl;
+         }
+#if defined(__linux__)
+         else if (string_is_equal(input_drv_name, "linuxraw"))
+         {
+            extern input_driver_t input_linuxraw;
+            *input_data = input_driver_init_wrap(&input_linuxraw, joypad_drv_name);
+            if (*input_data)
+               *input = &input_linuxraw;
+         }
+#endif
+      }
+
+      /* Default to SDL input if nothing else specified */
+      if (!*input_data)
+      {
+         *input_data = input_driver_init_wrap(&input_sdl, joypad_drv_name);
+         if (*input_data)
+            *input = &input_sdl;
+      }
+   }
+#endif
 
    return vid;
 
