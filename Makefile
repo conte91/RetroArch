@@ -251,10 +251,7 @@ $(TARGET): $(RARCH_OBJ)
 	$(Q)$(LINK) -o $@ $(RARCH_OBJ) $(LIBS) $(LDFLAGS) $(LIBRARY_DIRS)
 
 ifeq ($(STRIP_BIN),1)
-	echo "IO SONO LEGGENDA"
 	$(STRIP) --strip-unneeded $(TARGET)
-else
-	echo "IO SONO LEGENDA"
 endif
 
 $(OBJDIR)/%.o: %.c
