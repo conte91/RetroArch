@@ -2,6 +2,7 @@
  *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *  Copyright (C) 2011-2017 - Daniel De Matteis
  *  Copyright (C) 2011-2017 - Higor Euripedes
+ *  Copyright (C) 2026      - Simone Baratta
  *
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -457,7 +458,6 @@ static void *sdl2_gfx_init(const video_info_t *video,
 #if defined(__linux__)
          else if (string_is_equal(input_drv_name, "linuxraw"))
          {
-            extern input_driver_t input_linuxraw;
             *input_data = input_driver_init_wrap(&input_linuxraw, joypad_drv_name);
             if (*input_data)
                *input = &input_linuxraw;
