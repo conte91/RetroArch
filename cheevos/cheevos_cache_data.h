@@ -145,7 +145,7 @@ void rcheevos_cache_unlocks_free(rcheevos_cache_user_unlocks_t* data);
 /* Pending queue */
 bool rcheevos_cache_pending_serialize(const rcheevos_cache_pending_list_t* data, char** json_out);
 bool rcheevos_cache_pending_deserialize(const char* json, rcheevos_cache_pending_list_t* data_out);
-void rcheevos_cache_pending_free(rcheevos_cache_pending_list_t* data);
+void rcheevos_cache_pending_list_free(rcheevos_cache_pending_list_t* data);
 
 RETRO_END_DECLS
 

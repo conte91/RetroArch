@@ -45,13 +45,13 @@ START_TEST(test_pending_one_achievement_roundtrip)
    char *json = NULL;
 
    memset(&entry, 0, sizeof(entry));
-   entry.id            = 99001;
-   entry.timestamp     = 1700000001;
-   entry.retries       = 3;
-   entry.hardcore      = true;
+   entry.id = 99001;
+   entry.timestamp = 1700000001;
+   entry.retries = 3;
+   entry.hardcore = true;
    entry.is_leaderboard = false;
 
-   src.entries     = &entry;
+   src.entries = &entry;
    src.num_entries = 1;
 
    ck_assert(rcheevos_cache_pending_serialize(&src, &json));
@@ -62,13 +62,13 @@ START_TEST(test_pending_one_achievement_roundtrip)
 
    ck_assert_uint_eq(dst.num_entries, 1);
    ck_assert_uint_eq(dst.entries[0].id, 99001);
-   ck_assert_int_eq((long long)dst.entries[0].timestamp, 1700000001LL);
+   ck_assert_int_eq((long long) dst.entries[0].timestamp, 1700000001LL);
    ck_assert_uint_eq(dst.entries[0].retries, 3);
    ck_assert_int_eq(dst.entries[0].hardcore, true);
    ck_assert_int_eq(dst.entries[0].is_leaderboard, false);
 
    free(json);
-   rcheevos_cache_pending_free(&dst);
+   rcheevos_cache_pending_list_free(&dst);
 }
 END_TEST
 
@@ -81,12 +81,12 @@ START_TEST(test_pending_achievement_softcore_roundtrip)
    char *json = NULL;
 
    memset(&entry, 0, sizeof(entry));
-   entry.id            = 99002;
-   entry.timestamp     = 1700000002;
-   entry.hardcore      = false;
+   entry.id = 99002;
+   entry.timestamp = 1700000002;
+   entry.hardcore = false;
    entry.is_leaderboard = false;
 
-   src.entries     = &entry;
+   src.entries = &entry;
    src.num_entries = 1;
 
    ck_assert(rcheevos_cache_pending_serialize(&src, &json));
@@ -99,7 +99,7 @@ START_TEST(test_pending_achievement_softcore_roundtrip)
    ck_assert_int_eq(dst.entries[0].hardcore, false);
 
    free(json);
-   rcheevos_cache_pending_free(&dst);
+   rcheevos_cache_pending_list_free(&dst);
 }
 END_TEST
 
@@ -112,13 +112,13 @@ START_TEST(test_pending_leaderboard_with_score_roundtrip)
    char *json = NULL;
 
    memset(&entry, 0, sizeof(entry));
-   entry.id            = 55001;
-   entry.timestamp     = 1700000003;
-   entry.hardcore      = true;
+   entry.id = 55001;
+   entry.timestamp = 1700000003;
+   entry.hardcore = true;
    entry.is_leaderboard = true;
-   entry.score         = -42000;   /* negative scores are valid */
+   entry.score = -42000; /* negative scores are valid */
 
-   src.entries     = &entry;
+   src.entries = &entry;
    src.num_entries = 1;
 
    ck_assert(rcheevos_cache_pending_serialize(&src, &json));
@@ -133,7 +133,7 @@ START_TEST(test_pending_leaderboard_with_score_roundtrip)
    ck_assert_int_eq(dst.entries[0].score, -42000);
 
    free(json);
-   rcheevos_cache_pending_free(&dst);
+   rcheevos_cache_pending_list_free(&dst);
 }
 END_TEST
 
@@ -149,10 +149,14 @@ START_TEST(test_pending_multiple_entries_roundtrip)
    uint32_t i;
 
    memset(entries, 0, sizeof(entries));
-   entries[0].id = 11111; entries[0].timestamp = 1700000010; entries[0].hardcore = true;
-   entries[1].id = 22222; entries[1].timestamp = 1700000020; entries[1].hardcore = false;
+   entries[0].id = 11111;
+   entries[0].timestamp = 1700000010;
+   entries[0].hardcore = true;
+   entries[1].id = 22222;
+   entries[1].timestamp = 1700000020;
+   entries[1].hardcore = false;
 
-   src.entries     = entries;
+   src.entries = entries;
    src.num_entries = 2;
 
    ck_assert(rcheevos_cache_pending_serialize(&src, &json));
@@ -169,7 +173,7 @@ START_TEST(test_pending_multiple_entries_roundtrip)
              (ids[0] == 22222 && ids[1] == 11111));
 
    free(json);
-   rcheevos_cache_pending_free(&dst);
+   rcheevos_cache_pending_list_free(&dst);
 }
 END_TEST
 
@@ -180,7 +184,7 @@ START_TEST(test_pending_empty_list_roundtrip)
    rcheevos_cache_pending_list_t dst;
    char *json = NULL;
 
-   src.entries     = NULL;
+   src.entries = NULL;
    src.num_entries = 0;
 
    ck_assert(rcheevos_cache_pending_serialize(&src, &json));
@@ -191,7 +195,7 @@ START_TEST(test_pending_empty_list_roundtrip)
    ck_assert_uint_eq(dst.num_entries, 0);
 
    free(json);
-   rcheevos_cache_pending_free(&dst);
+   rcheevos_cache_pending_list_free(&dst);
 }
 END_TEST
 
@@ -208,7 +212,7 @@ START_TEST(test_pending_null_inputs_are_safe)
    ck_assert(!rcheevos_cache_pending_deserialize(NULL, &list));
    ck_assert(!rcheevos_cache_pending_deserialize("[]", NULL));
 
-   rcheevos_cache_pending_free(NULL); /* must not crash */
+   rcheevos_cache_pending_list_free(NULL); /* must not crash */
 }
 END_TEST
 
@@ -220,11 +224,11 @@ START_TEST(test_pending_malformed_json_does_not_crash)
    memset(&dst, 0, sizeof(dst));
    /* Return value is unspecified for garbage input, but it must not crash */
    rcheevos_cache_pending_deserialize("{not valid json!!!", &dst);
-   rcheevos_cache_pending_free(&dst);
+   rcheevos_cache_pending_list_free(&dst);
 
    memset(&dst, 0, sizeof(dst));
    rcheevos_cache_pending_deserialize("", &dst);
-   rcheevos_cache_pending_free(&dst);
+   rcheevos_cache_pending_list_free(&dst);
 }
 END_TEST
 
@@ -285,37 +289,37 @@ START_TEST(test_game_data_with_content_roundtrip)
    char *json = NULL;
 
    memset(&ach, 0, sizeof(ach));
-   ach.id          = 1001;
-   ach.points      = 10;
-   ach.category    = 3;
-   ach.title       = "First Blood";
+   ach.id = 1001;
+   ach.points = 10;
+   ach.category = 3;
+   ach.title = "First Blood";
    ach.description = "Kill your first enemy";
-   ach.definition  = "0xH0001=1";
-   ach.author      = "devuser";
-   ach.badge_name  = "badge_01";
-   ach.created     = 1600000000;
-   ach.updated     = 1600000001;
+   ach.definition = "0xH0001=1";
+   ach.author = "devuser";
+   ach.badge_name = "badge_01";
+   ach.created = 1600000000;
+   ach.updated = 1600000001;
 
    memset(&lb, 0, sizeof(lb));
-   lb.id              = 2001;
-   lb.format          = 1;
-   lb.title           = "Fastest Run";
-   lb.description     = "Complete the level as fast as possible";
-   lb.definition      = "STA:0xH0010=1::SUB:0xH0010=0::VAL:0xV0020";
+   lb.id = 2001;
+   lb.format = 1;
+   lb.title = "Fastest Run";
+   lb.description = "Complete the level as fast as possible";
+   lb.definition = "STA:0xH0010=1::SUB:0xH0010=0::VAL:0xV0020";
    lb.lower_is_better = 1;
-   lb.hidden          = 0;
+   lb.hidden = 0;
 
    memset(&src, 0, sizeof(src));
-   src.id                  = 777;
-   src.console_id          = 7;
-   src.title               = "Test Game";
-   src.image_name          = "game_badge.png";
+   src.id = 777;
+   src.console_id = 7;
+   src.title = "Test Game";
+   src.image_name = "game_badge.png";
    src.rich_presence_script = "Display:\nPlaying";
-   src.cached_at           = 1700000000;
-   src.achievements        = &ach;
-   src.num_achievements    = 1;
-   src.leaderboards        = &lb;
-   src.num_leaderboards    = 1;
+   src.cached_at = 1700000000;
+   src.achievements = &ach;
+   src.num_achievements = 1;
+   src.leaderboards = &lb;
+   src.num_leaderboards = 1;
 
    ck_assert(rcheevos_cache_game_serialize(&src, &json));
    ck_assert_ptr_nonnull(json);
@@ -328,7 +332,7 @@ START_TEST(test_game_data_with_content_roundtrip)
    ck_assert_str_eq(dst.title, "Test Game");
    ck_assert_str_eq(dst.image_name, "game_badge.png");
    ck_assert_str_eq(dst.rich_presence_script, "Display:\nPlaying");
-   ck_assert_int_eq((long long)dst.cached_at, 1700000000LL);
+   ck_assert_int_eq((long long) dst.cached_at, 1700000000LL);
 
    ck_assert_uint_eq(dst.num_achievements, 1);
    ck_assert_uint_eq(dst.achievements[0].id, 1001);
@@ -339,8 +343,8 @@ START_TEST(test_game_data_with_content_roundtrip)
    ck_assert_str_eq(dst.achievements[0].definition, "0xH0001=1");
    ck_assert_str_eq(dst.achievements[0].author, "devuser");
    ck_assert_str_eq(dst.achievements[0].badge_name, "badge_01");
-   ck_assert_int_eq((long long)dst.achievements[0].created, 1600000000LL);
-   ck_assert_int_eq((long long)dst.achievements[0].updated, 1600000001LL);
+   ck_assert_int_eq((long long) dst.achievements[0].created, 1600000000LL);
+   ck_assert_int_eq((long long) dst.achievements[0].updated, 1600000001LL);
 
    ck_assert_uint_eq(dst.num_leaderboards, 1);
    ck_assert_uint_eq(dst.leaderboards[0].id, 2001);
@@ -364,9 +368,9 @@ START_TEST(test_game_data_empty_arrays_roundtrip)
    char *json = NULL;
 
    memset(&src, 0, sizeof(src));
-   src.id         = 888;
+   src.id = 888;
    src.console_id = 1;
-   src.title      = "Empty Game";
+   src.title = "Empty Game";
 
    ck_assert(rcheevos_cache_game_serialize(&src, &json));
    ck_assert_ptr_nonnull(json);
@@ -421,9 +425,9 @@ START_TEST(test_user_unlocks_roundtrip)
    unlocks[2].achievement_id = 1003;
 
    memset(&src, 0, sizeof(src));
-   src.username     = "testuser";
-   src.unlocks      = unlocks;
-   src.num_unlocks  = 3;
+   src.username = "testuser";
+   src.unlocks = unlocks;
+   src.num_unlocks = 3;
    src.last_updated = 1700000000;
 
    ck_assert(rcheevos_cache_unlocks_serialize(&src, &json));
@@ -438,9 +442,12 @@ START_TEST(test_user_unlocks_roundtrip)
    found = 0;
    for (i = 0; i < dst.num_unlocks; i++)
    {
-      if (dst.unlocks[i].achievement_id == 1001) found |= 1;
-      if (dst.unlocks[i].achievement_id == 1002) found |= 2;
-      if (dst.unlocks[i].achievement_id == 1003) found |= 4;
+      if (dst.unlocks[i].achievement_id == 1001)
+         found |= 1;
+      if (dst.unlocks[i].achievement_id == 1002)
+         found |= 2;
+      if (dst.unlocks[i].achievement_id == 1003)
+         found |= 4;
    }
    ck_assert_uint_eq(found, 7);
 
@@ -456,8 +463,8 @@ START_TEST(test_user_unlocks_empty_roundtrip)
    char *json = NULL;
 
    memset(&src, 0, sizeof(src));
-   src.username    = "testuser";
-   src.unlocks     = NULL;
+   src.username = "testuser";
+   src.unlocks = NULL;
    src.num_unlocks = 0;
 
    ck_assert(rcheevos_cache_unlocks_serialize(&src, &json));
@@ -493,10 +500,10 @@ END_TEST
 
 Suite *create_suite(void)
 {
-   Suite *s          = suite_create(SUITE_NAME);
+   Suite *s = suite_create(SUITE_NAME);
    TCase *tc_pending = tcase_create("Pending");
-   TCase *tc_hash    = tcase_create("Hash");
-   TCase *tc_game    = tcase_create("Game");
+   TCase *tc_hash = tcase_create("Hash");
+   TCase *tc_game = tcase_create("Game");
    TCase *tc_unlocks = tcase_create("Unlocks");
 
    tcase_add_test(tc_pending, test_pending_one_achievement_roundtrip);
@@ -528,7 +535,7 @@ Suite *create_suite(void)
 int main(void)
 {
    int num_fail;
-   Suite *s   = create_suite();
+   Suite *s = create_suite();
    SRunner *sr = srunner_create(s);
    srunner_run_all(sr, CK_NORMAL);
    num_fail = srunner_ntests_failed(sr);

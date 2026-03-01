@@ -669,6 +669,6 @@ bool rcheevos_cache_remove_pending_unlock(
    if (found)
       rcheevos_cache_save_pending_unlocks(username, game_id, &pending);
 
-   rcheevos_cache_pending_free(&pending);
+   rcheevos_cache_pending_list_free(&pending);
    return found;
 }
