@@ -12,7 +12,7 @@ CXX		?= g++
 STRIP		?= strip
 INC_DIR		?=
 LIB_DIR		?=
-LTO		=
+LTO		= -flto
 STRIP_BIN	= 0
 else
 # Miyoo Mini cross-compile toolchain
@@ -222,6 +222,7 @@ OBJDIR_BASE := obj-unix
 ifeq ($(DEBUG), 1)
    OBJDIR := $(OBJDIR_BASE)/debug
    DEF_FLAGS += -O0 -g -DDEBUG -D_DEBUG
+   LTO =
 else
    OBJDIR := $(OBJDIR_BASE)/release
    DEF_FLAGS += -Ofast -DNDEBUG
